@@ -154,28 +154,6 @@
             text-align: left;
         }
 
-        .dg-param-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            font-weight: 800;
-            font-size: 0.82rem;
-            color: #111827;
-        }
-
-        .dg-param-value {
-            min-width: 64px;
-            text-align: right;
-            font-family: 'Chivo Mono', monospace;
-            font-size: 0.86rem;
-            color: #0f172a;
-            background: #f8fafc;
-            border: 1px solid #dbe3ee;
-            border-radius: 6px;
-            padding: 2px 6px;
-        }
-
         .serial-fail {
             color: #ef4444;
             font-weight: 700;
@@ -290,28 +268,16 @@
                     </div>
                     <div class="dg-status-column">
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">P</span>
-                                <span id="dg1-param-p" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg1-ready-light" class="status-light light-ready"></div>
+                            <span class="dg-status-label font-extrabold">READY</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">F</span>
-                                <span id="dg1-param-f" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg1-run-light" class="status-light light-run"></div>
+                            <span class="dg-status-label font-extrabold">RUNNING</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">V</span>
-                                <span id="dg1-param-v" class="dg-param-value">--</span>
-                            </div>
-                        </div>
-                        <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">A</span>
-                                <span id="dg1-param-a" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg1-alarm-light" class="status-light light-alarm"></div>
+                            <span class="dg-status-label font-extrabold">ALARM</span>
                         </div>
                     </div>
                 </div>
@@ -327,28 +293,16 @@
                     </div>
                     <div class="dg-status-column">
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">P</span>
-                                <span id="dg2-param-p" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg2-ready-light" class="status-light light-ready"></div>
+                            <span class="dg-status-label font-extrabold">READY</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">F</span>
-                                <span id="dg2-param-f" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg2-run-light" class="status-light light-run"></div>
+                            <span class="dg-status-label font-extrabold">RUNNING</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">V</span>
-                                <span id="dg2-param-v" class="dg-param-value">--</span>
-                            </div>
-                        </div>
-                        <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">A</span>
-                                <span id="dg2-param-a" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg2-alarm-light" class="status-light light-alarm"></div>
+                            <span class="dg-status-label font-extrabold">ALARM</span>
                         </div>
                     </div>
                 </div>
@@ -364,28 +318,16 @@
                     </div>
                     <div class="dg-status-column">
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">P</span>
-                                <span id="dg3-param-p" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg3-ready-light" class="status-light light-ready"></div>
+                            <span class="dg-status-label font-extrabold">READY</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">F</span>
-                                <span id="dg3-param-f" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg3-run-light" class="status-light light-run"></div>
+                            <span class="dg-status-label font-extrabold">RUNNING</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">V</span>
-                                <span id="dg3-param-v" class="dg-param-value">--</span>
-                            </div>
-                        </div>
-                        <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">A</span>
-                                <span id="dg3-param-a" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg3-alarm-light" class="status-light light-alarm"></div>
+                            <span class="dg-status-label font-extrabold">ALARM</span>
                         </div>
                     </div>
                 </div>
@@ -401,34 +343,21 @@
                     </div>
                     <div class="dg-status-column">
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">P</span>
-                                <span id="dg4-param-p" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg4-ready-light" class="status-light light-ready"></div>
+                            <span class="dg-status-label font-extrabold">READY</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">F</span>
-                                <span id="dg4-param-f" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg4-run-light" class="status-light light-run"></div>
+                            <span class="dg-status-label font-extrabold">RUNNING</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">V</span>
-                                <span id="dg4-param-v" class="dg-param-value">--</span>
-                            </div>
-                        </div>
-                        <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">A</span>
-                                <span id="dg4-param-a" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg4-alarm-light" class="status-light light-alarm"></div>
+                            <span class="dg-status-label font-extrabold">ALARM</span>
                         </div>
                     </div>
                 </div>
                 <div class="serial-fail" data-hide-when-ok="1"></div>
             </div>
-
 
             <!-- ME-PORT -->
             <div class="dg-card" data-dg-card="5">
@@ -439,28 +368,16 @@
                     </div>
                     <div class="dg-status-column">
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">P</span>
-                                <span id="dg5-param-p" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg5-ready-light" class="status-light light-ready"></div>
+                            <span class="dg-status-label font-extrabold">READY</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">F</span>
-                                <span id="dg5-param-f" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg5-run-light" class="status-light light-run"></div>
+                            <span class="dg-status-label font-extrabold">RUNNING</span>
                         </div>
                         <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">V</span>
-                                <span id="dg5-param-v" class="dg-param-value">--</span>
-                            </div>
-                        </div>
-                        <div class="dg-status-item">
-                            <div class="dg-param-row">
-                                <span class="dg-status-label">A</span>
-                                <span id="dg5-param-a" class="dg-param-value">--</span>
-                            </div>
+                            <div id="dg5-alarm-light" class="status-light light-alarm"></div>
+                            <span class="dg-status-label font-extrabold">ALARM</span>
                         </div>
                     </div>
                 </div>
@@ -489,7 +406,7 @@
             logoBox: { mode: "absolute", x: "50%", y: "0%", transform: "translateX(-50%)" },
             headerIcons: { mode: "absolute", x: "100%", y: "0%", transform: "translateX(-100%)" },
             systemStatusBar: { mode: "static" },
-            pmsPanel: { mode: "absolute", x: "34.5%", y: "44%", width: "31%", height: "140px" }
+            pmsPanel: { mode: "absolute", x: "60%", y: "44%", width: "31%", height: "140px" }
         };
 
         const CARD_LAYOUT = {
