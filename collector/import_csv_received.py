@@ -1,16 +1,22 @@
 import argparse
 import csv
 import datetime as dt
+import logging
 import os
 import shutil
+import signal
 import sqlite3
-import time
+import threading
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 RECEIVED_DIR = BASE_DIR / "data" / "csv_received"
 ARCHIVED_DIR = BASE_DIR / "data" / "csv_archived"
 DB_PATH = BASE_DIR / "data" / "live_engine_data.db"
+DEFAULT_INTERVAL = int(os.getenv("CSV_IMPORT_INTERVAL", "5"))
+DG_ORDER = {"DG#1": 1, "DG#2": 2, "DG#3": 3, "ME-PORT": 4, "ME-STBD": 5}
+DG_PREFIXES = ("DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD", "ME_PORT", "ME_STBD", "PMS")
+DG_PREFIXES_NO_PMS = ("DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD", "ME_PORT", "ME_STBD")
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -33,8 +39,16 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         """
+        UPDATE live_engine_data
+        SET dg_name = 'UNKNOWN'
+        WHERE dg_name IS NULL OR TRIM(dg_name) = '';
+        """
+    )
+    conn.execute("DROP INDEX IF EXISTS idx_live_engine_data_key;")
+    conn.execute(
+        """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_live_engine_data_key
-        ON live_engine_data (imo, serial, addr);
+        ON live_engine_data (imo, serial, dg_name, addr);
         """
     )
     conn.commit()
@@ -62,17 +76,39 @@ def parse_row(row: list[str]) -> tuple | None:
     else:
         return None
 
-    # Normalize dg_name from label prefix for 6 machine types.
     label = str(label).strip()
-    prefixes = ("DG#1", "DG#2", "DG#3", "ME_PORT", "ME_STBD", "PMS")
-    for prefix in prefixes:
-        if label.startswith(prefix + " "):
-            dg_name = prefix
-            label = label[len(prefix) + 1 :].strip()
-            break
+    dg_name = str(dg_name).strip()
+
+    if dg_name:
+        if dg_name.upper() in {"ME_PORT", "ME_STBD"}:
+            dg_name = dg_name.replace("_", "-")
+        label_variants = {dg_name}
+        if dg_name.upper().startswith("DG#"):
+            label_variants.add(dg_name.replace("#", ""))
+            label_variants.add(dg_name.replace("#", "-"))
+        if dg_name.upper() in {"ME-PORT", "ME-STBD"}:
+            label_variants.add(dg_name.replace("-", "_"))
+        for prefix in label_variants:
+            if label.startswith(prefix + " "):
+                label = label[len(prefix) + 1 :].strip()
+                break
+        if dg_name.upper() == "PMS":
+            for prefix in DG_PREFIXES_NO_PMS:
+                if label.startswith(prefix + " "):
+                    label = label[len(prefix) + 1 :].strip()
+                    break
+    else:
+        for prefix in DG_PREFIXES:
+            if label.startswith(prefix + " "):
+                dg_name = prefix.replace("ME_PORT", "ME-PORT").replace("ME_STBD", "ME-STBD")
+                label = label[len(prefix) + 1 :].strip()
+                break
 
     if str(serial).strip() == "" or str(addr).strip() == "" or str(label).strip() == "":
         return None
+
+    if dg_name == "":
+        dg_name = "UNKNOWN"
 
     try:
         val_num = float(val) if str(val).strip() != "" else None
@@ -82,30 +118,41 @@ def parse_row(row: list[str]) -> tuple | None:
     return (imo_val, serial, dg_name, str(addr), label, timestamp, val_num, unit)
 
 
+def _sort_key(row: tuple) -> tuple:
+    dg_name = row[2]
+    addr = row[3]
+    addr_key = int(addr) if str(addr).isdigit() else addr
+    return (DG_ORDER.get(dg_name, 99), row[1], addr_key)
+
+
 def import_csv_file(path: Path, conn: sqlite3.Connection) -> int:
-    imported = 0
+    parsed_rows: list[tuple] = []
     with path.open("r", newline="", encoding="utf-8-sig") as handle:
         reader = csv.reader(handle)
         for row in reader:
             parsed = parse_row(row)
             if not parsed:
                 continue
-            conn.execute(
-                """
-                INSERT INTO live_engine_data (imo, serial, dg_name, addr, label, timestamp, val, unit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(imo, serial, addr) DO UPDATE SET
-                    dg_name = excluded.dg_name,
-                    label = excluded.label,
-                    timestamp = excluded.timestamp,
-                    val = excluded.val,
-                    unit = excluded.unit;
-                """,
-                parsed,
-            )
-            imported += 1
+            parsed_rows.append(parsed)
+
+    parsed_rows.sort(key=_sort_key)
+
+    conn.executemany(
+        """
+        INSERT INTO live_engine_data (imo, serial, dg_name, addr, label, timestamp, val, unit)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(imo, serial, dg_name, addr) DO UPDATE SET
+            dg_name = excluded.dg_name,
+            label = excluded.label,
+            timestamp = excluded.timestamp,
+            val = excluded.val,
+            unit = excluded.unit
+        WHERE excluded.timestamp > live_engine_data.timestamp;
+        """,
+        parsed_rows,
+    )
     conn.commit()
-    return imported
+    return len(parsed_rows)
 
 
 def move_to_archived(path: Path) -> Path:
@@ -119,13 +166,15 @@ def move_to_archived(path: Path) -> Path:
 
 
 def run_once() -> None:
+    RECEIVED_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     if not RECEIVED_DIR.exists():
-        print(f"Missing folder: {RECEIVED_DIR}")
+        logging.warning("Missing folder: %s", RECEIVED_DIR)
         return
 
     files = sorted(RECEIVED_DIR.glob("*.csv"))
     if not files:
-        print("No CSV files found.")
         return
     import_targets = files
     if len(files) >= 2:
@@ -135,26 +184,33 @@ def run_once() -> None:
     conn = sqlite3.connect(DB_PATH)
     try:
         ensure_schema(conn)
+        conn.execute("DELETE FROM live_engine_data;")
+        conn.commit()
         for csv_file in import_targets:
             try:
                 imported = import_csv_file(csv_file, conn)
-                print(f"Imported {imported} rows from {csv_file.name}")
+                logging.info("Imported %s rows from %s", imported, csv_file.name)
             except Exception as exc:
-                print(f"Failed to import {csv_file.name}: {exc}")
+                logging.exception("Failed to import %s: %s", csv_file.name, exc)
         for csv_file in files:
             try:
                 archived_path = move_to_archived(csv_file)
-                print(f"Archived {csv_file.name} -> {archived_path.name}")
+                logging.info("Archived %s -> %s", csv_file.name, archived_path.name)
             except Exception as exc:
-                print(f"Failed to archive {csv_file.name}: {exc}")
+                logging.exception("Failed to archive %s: %s", csv_file.name, exc)
     finally:
         conn.close()
 
 
-def run_watch(interval_seconds: int) -> None:
-    while True:
-        run_once()
-        time.sleep(interval_seconds)
+def run_watch(interval_seconds: int, stop_event: threading.Event) -> None:
+    # Run forever as a service; keep looping even if a cycle fails.
+    while not stop_event.is_set():
+        try:
+            run_once()
+        except Exception as exc:
+            logging.exception("Unexpected error in run loop: %s", exc)
+        # Wait with interruption support for clean shutdown.
+        stop_event.wait(interval_seconds)
 
 
 def main() -> None:
@@ -162,22 +218,41 @@ def main() -> None:
         description="Import CSV files from data/csv_received into live_engine_data.db"
     )
     parser.add_argument(
-        "--watch",
+        "--once",
         action="store_true",
-        help="Keep watching the folder and import new CSV files.",
+        help="Run a single import cycle and exit.",
     )
     parser.add_argument(
         "--interval",
         type=int,
-        default=int(os.getenv("CSV_IMPORT_INTERVAL", "5")),
-        help="Polling interval in seconds when using --watch.",
+        default=DEFAULT_INTERVAL,
+        help="Polling interval in seconds when running continuously.",
     )
     args = parser.parse_args()
 
-    if args.watch:
-        run_watch(args.interval)
-    else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
+
+    if args.once:
         run_once()
+        return
+
+    stop_event = threading.Event()
+
+    def _handle_stop(signum, frame) -> None:
+        logging.info("Stopping on signal %s", signum)
+        stop_event.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, _handle_stop)
+        except Exception:
+            # Some environments don't support all signals (e.g. Windows SIGTERM).
+            pass
+
+    run_watch(args.interval, stop_event)
 
 
 if __name__ == "__main__":

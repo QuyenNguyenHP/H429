@@ -20,12 +20,14 @@
         }
 
         .main-container {
-            max-width: 1200px;
+            max-width: 1500px;
+            min-height: 1100px;
             margin: 0 auto;
             background-color: rgba(235, 237, 240, 0.95);
             border: 2px solid #4b5563;
             padding: 16px;
             box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            position: relative;
         }
 
         /* Đèn trạng thái (Status Lights) */
@@ -45,8 +47,8 @@
             box-shadow: 0 0 15px #10b981, inset 0 0 4px rgba(255,255,255,0.3); 
         }
         .light-ready.active {
-            background: radial-gradient(circle at 35% 35%, #facc15, #a16207);
-            box-shadow: 0 0 15px #facc15, inset 0 0 4px rgba(255,255,255,0.3);
+            background: radial-gradient(circle at 35% 35%, #34d399, #064e3b);
+            box-shadow: 0 0 15px #10b981, inset 0 0 4px rgba(255,255,255,0.3);
         }
         .light-alarm.active { 
             background: radial-gradient(circle at 35% 35%, #f87171, #7f1d1d); 
@@ -154,6 +156,42 @@
             text-align: left;
         }
 
+        .pms-card {
+            border-color: #9da2a8;
+        }
+
+        .pms-metrics {
+            display: grid;
+            grid-template-rows: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+            height: 100%;
+        }
+
+        .pms-value-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #111827;
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid #e2e8f0;
+            padding: 4px 6px;
+            border-radius: 6px;
+        }
+
+        .pms-value {
+            min-width: 72px;
+            text-align: right;
+            font-family: 'Chivo Mono', monospace;
+            font-size: 0.95rem;
+            color: #0f172a;
+            background: #f8fafc;
+            border: 1px solid #dbe3ee;
+            border-radius: 6px;
+            padding: 1px 6px;
+        }
+
         .serial-fail {
             color: #ef4444;
             font-weight: 700;
@@ -179,54 +217,6 @@
         .header-clickable:hover {
             transform: scale(1.08);
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-        }
-
-        .pms-panel {
-            position: absolute;
-            background: #ffffff;
-            border: 2px solid #0f172a;
-            box-shadow: inset 0 0 0 2px #e2e8f0, 0 8px 20px rgba(15, 23, 42, 0.15);
-            padding: 10px 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .pms-title {
-            font-weight: 800;
-            font-size: 1rem;
-            letter-spacing: 0.08em;
-            color: #0f172a;
-            border-bottom: 2px solid #0f172a;
-            padding-bottom: 4px;
-        }
-
-        .pms-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            height: 100%;
-        }
-
-        .pms-col {
-            background: linear-gradient(to bottom, #f8fafc, #eef2f7);
-            border: 1px solid #cbd5f5;
-            padding: 6px 8px;
-            display: grid;
-            grid-template-rows: repeat(4, 1fr);
-            gap: 6px;
-        }
-
-        .pms-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 700;
-            font-size: 0.78rem;
-            color: #111827;
-            background: rgba(255, 255, 255, 0.75);
-            border: 1px solid #e2e8f0;
-            padding: 4px 6px;
         }
 
     </style>
@@ -334,8 +324,87 @@
                 <div id="dg3-link-fail" class="serial-fail">FAIL CONNECTION !</div>
             </div>
 
+            <!-- PMS Cards -->
+            <div class="dg-card pms-card" data-pms-card="1">
+                <div class="pms-metrics">
+                    <div class="pms-value-row">
+                        <span>POWER FACTOR</span>
+                        <span id="pms-card-dg1-pf" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>FREQUENCY</span>
+                        <span id="pms-card-dg1-freq" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>CURRENT</span>
+                        <span id="pms-card-dg1-cur" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>VOLTAGE</span>
+                        <span id="pms-card-dg1-vol" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>POWER (kW)</span>
+                        <span id="pms-card-dg1-pwr" class="pms-value">--</span>
+                    </div>
+                </div>
+                <div class="serial-fail" data-hide-when-ok="1"></div>
+            </div>
+
+            <div class="dg-card pms-card" data-pms-card="2">
+                <div class="pms-metrics">
+                    <div class="pms-value-row">
+                        <span>POWER FACTOR</span>
+                        <span id="pms-card-dg2-pf" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>FREQUENCY</span>
+                        <span id="pms-card-dg2-freq" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>CURRENT</span>
+                        <span id="pms-card-dg2-cur" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>VOLTAGE</span>
+                        <span id="pms-card-dg2-vol" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>POWER (kW)</span>
+                        <span id="pms-card-dg2-pwr" class="pms-value">--</span>
+                    </div>
+                </div>
+                <div class="serial-fail" data-hide-when-ok="1"></div>
+            </div>
+
+            <div class="dg-card pms-card" data-pms-card="3">
+                <div class="pms-metrics">
+                    <div class="pms-value-row">
+                        <span>POWER FACTOR</span>
+                        <span id="pms-card-dg3-pf" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>FREQUENCY</span>
+                        <span id="pms-card-dg3-freq" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>CURRENT</span>
+                        <span id="pms-card-dg3-cur" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>VOLTAGE</span>
+                        <span id="pms-card-dg3-vol" class="pms-value">--</span>
+                    </div>
+                    <div class="pms-value-row">
+                        <span>POWER (kW)</span>
+                        <span id="pms-card-dg3-pwr" class="pms-value">--</span>
+                    </div>
+                </div>
+                <div class="serial-fail" data-hide-when-ok="1"></div>
+            </div>
+
             <!-- ME-STBD -->
-            <div class="dg-card" data-dg-card="4">
+            <div class="dg-card" data-dg-card="4" onclick="location.href='./ME_dashboard.html?dg=ME-STBD'">
                 <span class="dg-title">ME-STBD</span>
                 <div class="dg-card-main">
                     <div class="dg-engine-box dg-engine-visual flex items-center justify-center border border-gray-100">
@@ -360,7 +429,7 @@
             </div>
 
             <!-- ME-PORT -->
-            <div class="dg-card" data-dg-card="5">
+            <div class="dg-card" data-dg-card="5" onclick="location.href='./ME_dashboard.html?dg=ME-PORT'">
                 <span class="dg-title">ME-PORT</span>
                 <div class="dg-card-main">
                     <div class="dg-engine-box dg-engine-visual flex items-center justify-center border border-gray-100">
@@ -398,23 +467,33 @@
 
     <script>
         const API_BASE = "http://localhost:8000";
-        const DIGITAL_API_PATH = "/api/live/live_digital_value";
+        const INDEX_API_BASE = "/api/index";
+        const INDEX_DG_CONFIG = [
+            { cardNo: 1, dgName: "DG#1", hasPms: true },
+            { cardNo: 2, dgName: "DG#2", hasPms: true },
+            { cardNo: 3, dgName: "DG#3", hasPms: true },
+            { cardNo: 4, dgName: "ME-STBD", hasPms: false },
+            { cardNo: 5, dgName: "ME-PORT", hasPms: false }
+        ];
 
         // Cập nhật đồng hồ thời gian thực
         const UI_LAYOUT = {
             dateTimeBox: { mode: "absolute", x: "0%", y: "0%" },
             logoBox: { mode: "absolute", x: "50%", y: "0%", transform: "translateX(-50%)" },
             headerIcons: { mode: "absolute", x: "100%", y: "0%", transform: "translateX(-100%)" },
-            systemStatusBar: { mode: "static" },
-            pmsPanel: { mode: "absolute", x: "60%", y: "44%", width: "31%", height: "140px" }
-        };
-
-        const CARD_LAYOUT = {
-            "1": { x: "1.5%", y: "3%", width: "31%", height: "330px" },
-            "2": { x: "34.5%", y: "3%", width: "31%", height: "330px" },
-            "3": { x: "67.5%", y: "3%", width: "31%", height: "330px" },
-            "4": { x: "1.5%", y: "52%", width: "47%", height: "330px" },
-            "5": { x: "51.5%", y: "52%", width: "47%", height: "330px" }
+            systemStatusBar: { mode: "absolute", x: "1.5%", y: "96%", width: "97%" },
+            cards: {
+                "1": { x: "1.5%", y: "3%", width: "31%", height: "330px" },
+                "2": { x: "34.5%", y: "3%", width: "31%", height: "330px" },
+                "3": { x: "67.5%", y: "3%", width: "31%", height: "330px" },
+                "4": { x: "1.5%", y: "76%", width: "47%", height: "330px" },
+                "5": { x: "51.5%", y: "76%", width: "47%", height: "330px" }
+            },
+            pmsCards: {
+                "1": { x: "1.5%", y: "44%", width: "31%", height: "230px" },
+                "2": { x: "34.5%", y: "44%", width: "31%", height: "230px" },
+                "3": { x: "67.5%", y: "44%", width: "31%", height: "230px" }
+            }
         };
 
         function applyLayoutForElement(el, cfg) {
@@ -439,15 +518,32 @@
             applyLayoutForElement(document.getElementById("logo-box"), layout.logoBox);
             applyLayoutForElement(document.getElementById("header-icons"), layout.headerIcons);
             applyLayoutForElement(document.getElementById("system-status-bar"), layout.systemStatusBar);
-            applyLayoutForElement(document.getElementById("pms-panel"), layout.pmsPanel);
+            applyCardLayout(layout.cards);
+            applyPmsCardLayout(layout.pmsCards);
         }
 
-        function applyCardLayout(layout = CARD_LAYOUT) {
+        function applyCardLayout(layout) {
             const stage = document.getElementById("dg-cards-stage");
             if (!stage) return;
             const cards = stage.querySelectorAll(".dg-card[data-dg-card]");
             cards.forEach((card) => {
                 const key = card.getAttribute("data-dg-card");
+                const cfg = layout[key];
+                if (!cfg) return;
+                card.style.position = "absolute";
+                if (cfg.x != null) card.style.left = cfg.x;
+                if (cfg.y != null) card.style.top = cfg.y;
+                if (cfg.width != null) card.style.width = cfg.width;
+                if (cfg.height != null) card.style.height = cfg.height;
+            });
+        }
+
+        function applyPmsCardLayout(layout) {
+            const stage = document.getElementById("dg-cards-stage");
+            if (!stage || !layout) return;
+            const cards = stage.querySelectorAll(".pms-card[data-pms-card]");
+            cards.forEach((card) => {
+                const key = card.getAttribute("data-pms-card");
                 const cfg = layout[key];
                 if (!cfg) return;
                 card.style.position = "absolute";
@@ -484,6 +580,16 @@
             return normalized === "on" || normalized === "1" || normalized === "true";
         }
 
+        function formatPmsValue(point, opts = {}) {
+            if (!point || point.value == null) return "--";
+            const value = Number(point.value);
+            if (Number.isNaN(value)) return "--";
+            if (opts.treatAsEmptyValue != null && value === opts.treatAsEmptyValue) return "--";
+            const fixed = typeof opts.decimals === "number" ? value.toFixed(opts.decimals) : `${value}`;
+            const unit = (point.unit || "").trim();
+            return unit ? `${fixed} ${unit}` : `${fixed}`;
+        }
+
         function setDGState(dgNo, isRunning, isReady, hasAlarm, hasData) {
             const readyLight = document.getElementById(`dg${dgNo}-ready-light`);
             const runLight = document.getElementById(`dg${dgNo}-run-light`);
@@ -500,50 +606,71 @@
             }
         }
 
-        async function loadDigitalStates() {
+        async function loadIndexStatus() {
             try {
-                const res = await fetch(`${API_BASE}${DIGITAL_API_PATH}`, { cache: "no-store" });
-                if (!res.ok) throw new Error(`API error: ${res.status}`);
-                const data = await res.json();
-                const rows = Array.isArray(data) ? data : [];
+                const results = await Promise.all(
+                    INDEX_DG_CONFIG.map(async (cfg) => {
+                        const url = `${API_BASE}${INDEX_API_BASE}/${encodeURIComponent(cfg.dgName)}`;
+                        const res = await fetch(url, { cache: "no-store" });
+                        if (!res.ok) throw new Error(`API error ${cfg.dgName}: ${res.status}`);
+                        const data = await res.json();
+                        return { cfg, data };
+                    })
+                );
 
-                for (let dgNo = 1; dgNo <= 3; dgNo++) {
-                    const dgName = `DG#${dgNo}`;
-                    const dgRows = rows.filter(
-                        (r) => (r.dg_name || "").trim() === dgName
+                results.forEach(({ cfg, data }) => {
+                    const status = data?.status || {};
+                    setDGState(
+                        cfg.cardNo,
+                        !!status.running,
+                        !!status.ready,
+                        !!status.alarm,
+                        status.has_data !== false
                     );
-                    const runPoint = dgRows.find(
-                        (r) => (r.dg_name || "").trim() === dgName && (r.label || "").trim().toUpperCase() === "ENGINE RUN"
-                    );
-                    const readyPoint = dgRows.find(
-                        (r) => (r.label || "").trim().toUpperCase() === "READY TO START"
-                    );
-                    const hasData = dgRows.length > 0;
-                    const isRunning = isOnValue(runPoint?.value);
-                    const isReady = isOnValue(readyPoint?.value);
-                    const hasAlarm = dgRows.some((r) => {
-                        const label = String(r.label || "").trim().toUpperCase();
-                        if (label === "ENGINE RUN" || label === "READY TO START") return false;
-                        return isOnValue(r.value);
-                    });
-                    setDGState(dgNo, isRunning, isReady, hasAlarm, hasData);
-                }
+
+                    if (!cfg.hasPms) return;
+                    const pms = data?.pms || {};
+                    const dgNo = cfg.cardNo;
+                    const pfEl = document.getElementById(`pms-card-dg${dgNo}-pf`);
+                    const freqEl = document.getElementById(`pms-card-dg${dgNo}-freq`);
+                    const curEl = document.getElementById(`pms-card-dg${dgNo}-cur`);
+                    const volEl = document.getElementById(`pms-card-dg${dgNo}-vol`);
+                    const pwrEl = document.getElementById(`pms-card-dg${dgNo}-pwr`);
+
+                    if (pfEl) pfEl.textContent = formatPmsValue(pms.power_factor, { treatAsEmptyValue: 32.768 });
+                    if (freqEl) freqEl.textContent = formatPmsValue(pms.frequency);
+                    if (curEl) curEl.textContent = formatPmsValue(pms.current, { decimals: 2 });
+                    if (volEl) volEl.textContent = formatPmsValue(pms.voltage);
+                    if (pwrEl) pwrEl.textContent = formatPmsValue(pms.power_kw);
+                });
             } catch (error) {
-                console.error("Digital fetch error:", error);
-                for (let dgNo = 1; dgNo <= 3; dgNo++) {
-                    setDGState(dgNo, false, false, false, false);
-                }
+                console.error("Index API fetch error:", error);
+                INDEX_DG_CONFIG.forEach((cfg) => {
+                    setDGState(cfg.cardNo, false, false, false, false);
+                    if (!cfg.hasPms) return;
+                    const dgNo = cfg.cardNo;
+                    const pfEl = document.getElementById(`pms-card-dg${dgNo}-pf`);
+                    const freqEl = document.getElementById(`pms-card-dg${dgNo}-freq`);
+                    const curEl = document.getElementById(`pms-card-dg${dgNo}-cur`);
+                    const volEl = document.getElementById(`pms-card-dg${dgNo}-vol`);
+                    const pwrEl = document.getElementById(`pms-card-dg${dgNo}-pwr`);
+
+                    if (pfEl) pfEl.textContent = "--";
+                    if (freqEl) freqEl.textContent = "--";
+                    if (curEl) curEl.textContent = "--";
+                    if (volEl) volEl.textContent = "--";
+                    if (pwrEl) pwrEl.textContent = "--";
+                });
             }
         }
 
         // Khởi tạo các sự kiện
         window.onload = () => {
             applyUILayout();
-            applyCardLayout();
             updateClock();
-            loadDigitalStates();
+            loadIndexStatus();
             setInterval(updateClock, 1000); // Cập nhật mỗi giây
-            setInterval(loadDigitalStates, 5000); // Cập nhật trạng thái RUN/ALARM mỗi 5 giây
+            setInterval(loadIndexStatus, 5000); // Cập nhật trạng thái + PMS mỗi 5 giây
             setInterval(blinkAlerts, 750); // Nhấp nháy lỗi mỗi 0.75 giây
         };
     </script>

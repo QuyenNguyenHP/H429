@@ -315,13 +315,14 @@
                 <div class="flex items-center">
                     <select
                         id="dg-selector"
-                        class="header-clickable dg-selector text-4xl font-bold text-red-600/70 drop-shadow-sm bg-transparent border border-red-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-red-300"
+                        class="header-clickable dg-selector text-4xl font-bold text-blue-600/70 drop-shadow-sm bg-transparent border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                         aria-label="Select DG"
                     >
-                        <option value="1">DG1</option>
-                        <option value="2">DG2</option>
-                        <option value="3">DG3</option>
-                        <option value="4">DG4</option>
+                        <option value="DG#1">DG#1</option>
+                        <option value="DG#2">DG#2</option>
+                        <option value="DG#3">DG#3</option>
+                        <option value="ME-PORT">ME-PORT</option>
+                        <option value="ME-STBD">ME-STBD</option>
                     </select>
                 </div>
                 
@@ -462,11 +463,32 @@
         </div>
     </div>
 
+    <script src="./dashboard_shared.js"></script>
     <script>
         // Báº£n Ä‘á»“ Ã¡nh xáº¡ nhÃ£n Backend -> ID Frontend
+        const DG_OPTIONS = ["DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD"];
+        const API_BASE = "http://localhost:8000/api/dashboard";
         const dgParam = new URLSearchParams(window.location.search).get("dg");
-        const dgNumber = ["1", "2", "3", "4"].includes(String(dgParam)) ? String(dgParam) : "1";
-        const TARGET_DG_NAME = `DG#${dgNumber}`;
+        const {
+            getById,
+            normalizeDgName,
+            filterByTarget,
+            setText,
+            isOnValue,
+            applyLayoutToElement,
+            fetchWithTimeout
+        } = window.DashboardShared;
+        function normalizeDgParam(param) {
+            if (param == null) return "DG#1";
+            const raw = String(param).trim().toUpperCase();
+            if (raw === "1" || raw === "DG1" || raw === "DG#1") return "DG#1";
+            if (raw === "2" || raw === "DG2" || raw === "DG#2") return "DG#2";
+            if (raw === "3" || raw === "DG3" || raw === "DG#3") return "DG#3";
+            if (raw.replace(/\s+/g, "-") === "ME-PORT") return "ME-PORT";
+            if (raw.replace(/\s+/g, "-") === "ME-STBD") return "ME-STBD";
+            return "DG#1";
+        }
+        const TARGET_DG_NAME = normalizeDgParam(dgParam);
         const DATA_MAPPING = {
             "ENGINE SPEED": "val-engine-speed",
             "RUNNING HOUR": "val-running-hour",
@@ -568,6 +590,9 @@
             { addr: 0x81, label: "T/C SPEED SENSOR FAILURE", unit: "On/Off" }
         ];
 
+        const isME = () => TARGET_DG_NAME === "ME-PORT" || TARGET_DG_NAME === "ME-STBD";
+        const filterRowsByTarget = (rows) => filterByTarget(rows, TARGET_DG_NAME);
+
         const UI_LAYOUT = {
             cylinders: {
                 count: 6,
@@ -594,24 +619,6 @@
                 'lo-inlet-t': { x: '63%', y: '62%', scale: 1.0, labelWidth: '200px', valueWidth: '60px' }
             }
         };
-
-        function applyLayoutToElement(el, cfg) {
-            if (!el || !cfg) return;
-            if (cfg.anchor === 'right') {
-                if (cfg.x) el.style.right = `calc(100% - ${cfg.x})`;
-                el.style.left = '';
-            } else if (cfg.x) {
-                el.style.left = cfg.x;
-                el.style.right = '';
-            }
-            if (cfg.y) el.style.top = cfg.y;
-            const scale = cfg.scale == null ? 1 : Number(cfg.scale);
-            if (!Number.isNaN(scale)) {
-                const baseTransform = cfg.translateYCenter ? 'translateY(-50%)' : '';
-                el.style.transform = `${baseTransform} scale(${scale})`.trim();
-                el.style.transformOrigin = cfg.anchor === 'right' ? 'top right' : 'top left';
-            }
-        }
 
         function applyUILayout() {
             applyLayoutToElement(document.getElementById('panel-engine-speed'), {
@@ -669,7 +676,18 @@
 
         function applyDGHeader() {
             const selectorEl = document.getElementById("dg-selector");
-            if (selectorEl) selectorEl.value = dgNumber;
+            if (selectorEl) selectorEl.value = TARGET_DG_NAME;
+        }
+
+        function updateSelectorColor(value) {
+            const selectorEl = document.getElementById("dg-selector");
+            if (!selectorEl) return;
+            selectorEl.classList.remove(
+                "text-red-600/70",
+                "border-red-300",
+                "focus:ring-red-300"
+            );
+            selectorEl.classList.add("text-blue-600/70", "border-blue-300", "focus:ring-blue-300");
         }
 
         function bindDGSelector() {
@@ -677,7 +695,12 @@
             if (!selectorEl) return;
             selectorEl.addEventListener("change", () => {
                 const next = selectorEl.value;
-                if (!["1", "2", "3", "4"].includes(next)) return;
+                if (!DG_OPTIONS.includes(next)) return;
+                updateSelectorColor(next);
+                if (next === "ME-PORT" || next === "ME-STBD") {
+                    window.location.href = `./ME_dashboard.html?dg=${encodeURIComponent(next)}`;
+                    return;
+                }
                 const url = new URL(window.location.href);
                 url.searchParams.set("dg", next);
                 window.location.href = url.toString();
@@ -705,19 +728,17 @@
         function updateUI(data) {
             if (!data || data.length === 0) return;
 
-            data
-                .filter(item => (item.dg_name || "").trim() === TARGET_DG_NAME)
-                .forEach(item => {
+            filterRowsByTarget(data).forEach(item => {
                 if (item.value == null || item.label == null) return;
                 // Xá»­ lÃ½ cÃ¡c giÃ¡ trá»‹ Cylinder (No.1 - No.6)
                 if (item.label.includes("No.")) {
                     const match = item.label.match(/No\.(\d+)/);
                     if (match) {
                         const cylId = `val-cyl-${match[1]}`;
-                        const el = document.getElementById(cylId);
+                        const el = getById(cylId);
                         if (el) {
                             const next = String(Math.round(item.value));
-                            if (el.textContent !== next) el.textContent = next;
+                            setText(el, next);
                             applyStatusStyle(el, item.status);
                         }
                     }
@@ -726,39 +747,31 @@
                 else {
                     const elementId = DATA_MAPPING[item.label];
                     if (elementId) {
-                        const el = document.getElementById(elementId);
+                        const el = getById(elementId);
                         if (el) {
                             const isPressure = item.label.includes("PRESSURE") || item.label.includes("INLET (MPa)");
                             const next = isPressure ? item.value.toFixed(2) : String(Math.round(item.value));
-                            if (el.textContent !== next) el.textContent = next;
+                            setText(el, next);
                             applyStatusStyle(el, item.status);
                         }
                     }
                 }
             });
 
-            const statusMsg = document.getElementById('status-msg');
+            const statusMsg = getById('status-msg');
             if (statusMsg) statusMsg.style.opacity = '0';
         }
 
-        function isOnValue(value) {
-            if (typeof value === "number") return value === 1;
-            const normalized = String(value ?? "").trim().toLowerCase();
-            return normalized === "on" || normalized === "1" || normalized === "true";
-        }
-
         function updateHeaderLights(digitalRows) {
-            const rows = Array.isArray(digitalRows)
-                ? digitalRows.filter(item => (item.dg_name || "").trim() === TARGET_DG_NAME)
-                : [];
+            const rows = filterRowsByTarget(digitalRows);
 
             const readyRow = rows.find(item => String(item.label || "").trim().toUpperCase() === "READY TO START");
             const runRow = rows.find(item => String(item.label || "").trim().toUpperCase() === "ENGINE RUN");
             const isEngineRunning = isOnValue(runRow?.value);
 
-            const readyLight = document.getElementById("light-ready");
-            const runLight = document.getElementById("light-run");
-            const engineBackgroundImage = document.getElementById("engine-background-image");
+            const readyLight = getById("light-ready");
+            const runLight = getById("light-run");
+            const engineBackgroundImage = getById("engine-background-image");
 
             if (readyLight) readyLight.classList.toggle("active", isOnValue(readyRow?.value));
             if (runLight) runLight.classList.toggle("active", isEngineRunning);
@@ -768,22 +781,20 @@
         }
 
         function updateAlarmLight(alarmRows) {
-            const alarmLight = document.getElementById("light-alarm");
+            const alarmLight = getById("light-alarm");
             if (!alarmLight) return;
             const rows = Array.isArray(alarmRows) ? alarmRows : [];
-            const dgAlarm = rows.find(item => (item.dg_name || "").trim() === TARGET_DG_NAME);
+            const dgAlarm = rows.find(item => normalizeDgName(item.dg_name) === TARGET_DG_NAME);
             alarmLight.classList.toggle("active", String(dgAlarm?.alarm || "").trim().toUpperCase() === "ON");
         }
 
         function updateDigitalTable(data) {
-            const leftTbody = document.getElementById("digital-value-tbody-left");
-            const rightTbody = document.getElementById("digital-value-tbody-right");
+            const leftTbody = getById("digital-value-tbody-left");
+            const rightTbody = getById("digital-value-tbody-right");
             if (!leftTbody || !rightTbody) return;
             leftTbody.innerHTML = "";
             rightTbody.innerHTML = "";
-            const rows = Array.isArray(data)
-                ? data.filter(item => (item.dg_name || "").trim() === TARGET_DG_NAME)
-                : [];
+            const rows = filterRowsByTarget(data);
             const valueByLabel = new Map();
             rows.forEach(item => {
                 const key = String(item.label || "").trim();
@@ -840,23 +851,14 @@
             if (isFetching) return;
             isFetching = true;
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+                const analogPath = isME()
+                    ? `${API_BASE}/analog_lable_value_ME`
+                    : `${API_BASE}/analog_lable_value`;
                 const [analogResponse, digitalResponse, alarmResponse] = await Promise.all([
-                    fetch("http://localhost:8000/api/live/analog_lable_value", {
-                        signal: controller.signal,
-                        cache: "no-store"
-                    }),
-                    fetch("http://localhost:8000/api/live/live_digital_value", {
-                        signal: controller.signal,
-                        cache: "no-store"
-                    }),
-                    fetch("http://localhost:8000/api/alarms/dg_status", {
-                        signal: controller.signal,
-                        cache: "no-store"
-                    })
+                    fetchWithTimeout(analogPath, FETCH_TIMEOUT_MS, { cache: "no-store" }),
+                    fetchWithTimeout(`${API_BASE}/live_digital_value`, FETCH_TIMEOUT_MS, { cache: "no-store" }),
+                    fetchWithTimeout(`${API_BASE}/dg_status`, FETCH_TIMEOUT_MS, { cache: "no-store" })
                 ]);
-                clearTimeout(timeoutId);
                 if (!analogResponse.ok) throw new Error(`Analog API error: ${analogResponse.status}`);
                 if (!digitalResponse.ok) throw new Error(`Digital API error: ${digitalResponse.status}`);
                 if (!alarmResponse.ok) throw new Error(`Alarm API error: ${alarmResponse.status}`);
@@ -876,7 +878,7 @@
                 console.error("Fetch error:", error);
                 consecutiveFailures += 1;
                 if (consecutiveFailures >= 2) {
-                    const statusMsg = document.getElementById('status-msg');
+                    const statusMsg = getById('status-msg');
                     if (statusMsg) statusMsg.style.opacity = '1';
                 }
                 updateHeaderLights([]);
@@ -890,12 +892,13 @@
             const now = new Date();
             const dateStr = now.toLocaleDateString('en-GB');
             const timeStr = now.toLocaleTimeString('en-GB', { hour12: false });
-            document.getElementById('current-datetime').innerHTML = `${dateStr} &nbsp;&nbsp; ${timeStr}`;
+            const el = getById('current-datetime');
+            if (el) el.innerHTML = `${dateStr} &nbsp;&nbsp; ${timeStr}`;
         }
 
         function bindHomeNavigation() {
             const goHome = () => { window.location.href = "./index.html"; };
-            const logo = document.getElementById("drums-logo-link");
+            const logo = getById("drums-logo-link");
             if (logo) logo.addEventListener("click", goHome);
         }
 
@@ -905,6 +908,7 @@
             bindHomeNavigation();
             applyUILayout();
             initCylinders();
+            updateSelectorColor(TARGET_DG_NAME);
             updateDigitalTable([]);
             updateDateTime();
             fetchData();

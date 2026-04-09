@@ -1,4 +1,4 @@
-from sqlalchemy import cast, select
+from sqlalchemy import case, cast, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.sqltypes import Integer
 
@@ -8,7 +8,19 @@ from app.schemas import LiveValueResponse
 
 def get_latest_all(db: Session) -> list[LiveValueResponse]:
     # Collector already upserts one latest row per (serial, addr), so fetch all rows directly.
-    stmt = select(LiveEngineData).order_by(LiveEngineData.serial, cast(LiveEngineData.addr, Integer))
+    dg_order = case(
+        (LiveEngineData.dg_name == "DG#1", 1),
+        (LiveEngineData.dg_name == "DG#2", 2),
+        (LiveEngineData.dg_name == "DG#3", 3),
+        (LiveEngineData.dg_name == "ME-PORT", 4),
+        (LiveEngineData.dg_name == "ME-STBD", 5),
+        else_=99,
+    )
+    stmt = select(LiveEngineData).order_by(
+        dg_order,
+        LiveEngineData.serial,
+        cast(LiveEngineData.addr, Integer),
+    )
 
     rows = db.execute(stmt).scalars().all()
     return [
