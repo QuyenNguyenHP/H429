@@ -94,6 +94,112 @@ cd collector
 python data_collector.py
 ```
 
+## 🚀 Deploy On VPS With systemd / systemctl
+
+Ví dụ dưới đây dùng:
+
+- source code đặt tại `/opt/engine-touchscreen-app`
+- user chạy service là `ubuntu`
+- backend chạy cổng `8000`
+- frontend static server chạy cổng `5170`
+
+Nếu VPS của bạn dùng user hoặc đường dẫn khác, hãy thay lại `User=`, `Group=`, `WorkingDirectory=` và `ExecStart=`.
+
+### 1) Tạo virtualenv và cài dependencies
+
+```bash
+cd /opt/engine-touchscreen-app
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2) Tạo service cho backend
+
+Tạo file `/etc/systemd/system/engine-backend.service`:
+
+```ini
+[Unit]
+Description=Engine Touchscreen Backend
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/engine-touchscreen-app/backend
+ExecStart=/opt/engine-touchscreen-app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Lưu ý:
+
+- Không dùng `python run.py` trong production vì file này đang bật `reload=True`.
+- Database SQLite đang được backend đọc từ `data/live_engine_data.db` ở thư mục gốc project.
+
+### 3) Tạo service cho frontend
+
+Tạo file `/etc/systemd/system/engine-frontend.service`:
+
+```ini
+[Unit]
+Description=Engine Touchscreen Frontend
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/engine-touchscreen-app/frontend
+ExecStart=/opt/engine-touchscreen-app/.venv/bin/python -m http.server 5170 --bind 0.0.0.0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Sau khi chạy service frontend, có thể truy cập:
+
+- `http://<VPS-IP>:5170/index.html`
+- `http://<VPS-IP>:5170/DGs_dashboard_V2.html?dg=DG%231`
+- `http://<VPS-IP>:5170/ME_dashboard.html?dg=ME-PORT`
+
+### 4) Reload và enable service
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable engine-backend
+sudo systemctl enable engine-frontend
+sudo systemctl start engine-backend
+sudo systemctl start engine-frontend
+```
+
+### 5) Kiểm tra trạng thái và log
+
+```bash
+sudo systemctl status engine-backend
+sudo systemctl status engine-frontend
+sudo journalctl -u engine-backend -f
+sudo journalctl -u engine-frontend -f
+```
+
+### 6) Mở port hoặc reverse proxy
+
+- Backend API: `8000`
+- Frontend static files: `5170`
+
+Nếu dùng firewall:
+
+```bash
+sudo ufw allow 8000/tcp
+sudo ufw allow 5170/tcp
+```
+
+Frontend hiện tự gọi API theo hostname hiện tại với cổng `8000`, nên khi mở trang từ `http://<VPS-IP>:5170`, frontend sẽ gọi API tới `http://<VPS-IP>:8000`.
+
 ## 📘 API Docs
 
 - Swagger UI: `http://localhost:8000/docs`
@@ -109,4 +215,3 @@ python data_collector.py
 
 - Backend: `backend/README.md`
 - Frontend: `frontend/README.md`
-
