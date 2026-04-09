@@ -105,5 +105,5 @@ Then open:
 ## 6. Notes 📝
 
 - `DGs_dashboard.html.bak` is a backup file, not an active page 💾
-- `config.js`, `index.js`, `app.css` are legacy files and are not currently imported by active pages 🧹
+- `config.js` and `index.js` are legacy files; `app.css` is the shared stylesheet for `index.html`, `ME_dashboard.html`, and `DGs_dashboard_V2.html` 🎨
 - If icon/logo/CSS changes are not visible immediately, hard refresh with `Ctrl + F5` 🔄
