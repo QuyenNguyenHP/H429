@@ -448,7 +448,6 @@
 
     <script src="./dashboard_shared.js"></script>
     <script>
-        const API_BASE = "http://localhost:8000/api/dashboard";
         const ME_OPTIONS = ["DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD"];
         const dgParam = new URLSearchParams(window.location.search).get("dg");
         const {
@@ -457,8 +456,10 @@
             filterByTarget,
             isOnValue,
             applyLayoutToElement,
-            fetchWithTimeout
+            fetchWithTimeout,
+            resolveApiOrigin
         } = window.DashboardShared;
+        const API_BASE = `${resolveApiOrigin()}/api/dashboard`;
         const ANALOG_FIXED_POINTS = [
             "BOOST AIR PRESS.",
             "FUEL OIL PRESS.",

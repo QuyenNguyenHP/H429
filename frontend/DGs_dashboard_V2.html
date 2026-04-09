@@ -467,7 +467,6 @@
     <script>
         // Báº£n Ä‘á»“ Ã¡nh xáº¡ nhÃ£n Backend -> ID Frontend
         const DG_OPTIONS = ["DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD"];
-        const API_BASE = "http://localhost:8000/api/dashboard";
         const dgParam = new URLSearchParams(window.location.search).get("dg");
         const {
             getById,
@@ -476,8 +475,10 @@
             setText,
             isOnValue,
             applyLayoutToElement,
-            fetchWithTimeout
+            fetchWithTimeout,
+            resolveApiOrigin
         } = window.DashboardShared;
+        const API_BASE = `${resolveApiOrigin()}/api/dashboard`;
         function normalizeDgParam(param) {
             if (param == null) return "DG#1";
             const raw = String(param).trim().toUpperCase();

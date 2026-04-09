@@ -1,7 +1,8 @@
 ﻿(function () {
   const config = window.APP_CONFIG || {};
   const paths = config.paths || {};
-  const API_BASE = config.apiBaseUrl || window.API_BASE_URL || "http://localhost:8000";
+  const inferredApiBase = `${window.location.protocol}//${window.location.hostname}:8000`;
+  const API_BASE = config.apiBaseUrl || window.API_BASE_URL || inferredApiBase;
   const API_PATH = paths.analog || "/api/live/analog_lable_value";
   const POLL_MS = Number(config.refreshMs) > 0 ? Number(config.refreshMs) : 5000;
 
@@ -80,4 +81,3 @@
   bindDGSelector();
   setInterval(load, POLL_MS);
 })();
-

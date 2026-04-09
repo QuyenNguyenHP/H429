@@ -466,7 +466,7 @@
     </div>
 
     <script>
-        const API_BASE = "http://localhost:8000";
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
         const INDEX_API_BASE = "/api/index";
         const INDEX_DG_CONFIG = [
             { cardNo: 1, dgName: "DG#1", hasPms: true },
