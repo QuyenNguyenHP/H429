@@ -29,17 +29,18 @@ frontend/
 ## 2. Active Pages 🌐
 
 - `index.html`
+
   - Home page 🏠
   - DG#1, DG#2, DG#3 cards open `DGs_dashboard_V2.html`.
   - ME-STBD and ME-PORT cards open `ME_dashboard.html`.
   - Uses aggregated status/PMS API from `/api/index/*` 🔗
-
 - `DGs_dashboard_V2.html`
+
   - DG detail page for DG#1, DG#2, DG#3 📊
   - Includes selector with DG and ME options.
   - If user selects ME-* from this page, it redirects to `ME_dashboard.html` 🔀
-
 - `ME_dashboard.html`
+
   - ME detail page for ME-PORT and ME-STBD 🚢
   - Includes selector with DG and ME options.
   - If user selects DG#1/2/3 from this page, it redirects to `DGs_dashboard_V2.html` 🔀
@@ -55,15 +56,18 @@ frontend/
   - Fetch timeout helper (`fetchWithTimeout`) ⏱️
 
 This file is loaded by:
+
 - `DGs_dashboard_V2.html`
 - `ME_dashboard.html`
 
 ## 4. API Endpoints Used by Frontend 🔌
 
 Base URL in frontend:
+
 - `http://localhost:8000`
 
 ### `index.html`
+
 - `GET /api/index/DG%231`
 - `GET /api/index/DG%232`
 - `GET /api/index/DG%233`
@@ -71,12 +75,14 @@ Base URL in frontend:
 - `GET /api/index/ME-STBD`
 
 ### `DGs_dashboard_V2.html`
+
 - `GET /api/dashboard/analog_lable_value` (DG mode)
 - `GET /api/dashboard/analog_lable_value_ME` (fallback when target is ME)
 - `GET /api/dashboard/live_digital_value`
 - `GET /api/dashboard/dg_status`
 
 ### `ME_dashboard.html`
+
 - `GET /api/dashboard/analog_lable_value_ME`
 - `GET /api/dashboard/live_digital_value`
 - `GET /api/dashboard/dg_status`
@@ -87,7 +93,7 @@ Open HTML files directly, or run a static server:
 
 ```bash
 cd frontend
-python -m http.server 5170
+python3 -m http.server 5170 --bind 0.0.0.0
 ```
 
 Then open:
