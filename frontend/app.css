@@ -11,12 +11,11 @@
     --light-off-border: #374151;
     --light-green-start: #34d399;
     --light-green-end: #065f46;
-    --light-green-glow: #10b981;
-    --light-red-start: #f87171;
+    --light-green-glow: #065f46;
+    --light-red-start: #ee7171;
     --light-red-end: #991b1b;
     --light-red-glow: #ef4444;
     --status-light-size: 28px;
-    --status-light-blink-speed: 1000ms;
     --status-light-glow-blur: 10px;
 }
 
@@ -51,22 +50,15 @@ body {
     transition: all 0.3s ease;
 }
 
-@keyframes status-light-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
 .light-ready.active,
 .light-run.active {
     background: radial-gradient(circle at 30% 30%, var(--light-green-start), var(--light-green-end));
     box-shadow: 0 0 var(--status-light-glow-blur) var(--light-green-glow);
-    animation: status-light-blink var(--status-light-blink-speed) steps(2, end) infinite;
 }
 
 .light-alarm.active {
     background: radial-gradient(circle at 30% 30%, var(--light-red-start), var(--light-red-end));
     box-shadow: 0 0 var(--status-light-glow-blur) var(--light-red-glow);
-    animation: status-light-blink var(--status-light-blink-speed) steps(2, end) infinite;
 }
 
 .header-status-item {
