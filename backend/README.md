@@ -5,7 +5,7 @@ Backend API built with FastAPI + SQLite for DG/ME monitoring.
 ## Key Features ✨
 
 - FastAPI REST API ⚡
-- SQLite data source (`data/live_engine_data.db`) 🗄️
+- SQLite data source (`collector/live_engine_data.db`) 🗄️
 - Layered structure (`api/`, `services/`, `models/`, `schemas/`) 🧠
 - CORS enabled (`CORS_ORIGINS = ["*"]`) 🌐
 - Swagger/OpenAPI docs out of the box 📘
@@ -123,7 +123,7 @@ Browser:
 ## Troubleshooting 🛠️
 
 1. API returns empty list `[]` ❌
-- Check collector import status and recent data in `data/live_engine_data.db`.
+- Check collector import status and recent data in `collector/live_engine_data.db`.
 - Verify `timestamp` values are recent.
 
 2. Frontend cannot fetch API 🌐

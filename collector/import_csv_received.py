@@ -9,14 +9,38 @@ import sqlite3
 import threading
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-RECEIVED_DIR = BASE_DIR / "data" / "csv_received"
-ARCHIVED_DIR = BASE_DIR / "data" / "csv_archived"
-DB_PATH = BASE_DIR / "data" / "live_engine_data.db"
+BASE_DIR = Path(__file__).resolve().parent
+RECEIVED_DIR = BASE_DIR / "csv_received"
+ARCHIVED_DIR = BASE_DIR / "csv_archived"
+DB_PATH = BASE_DIR / "live_engine_data.db"
 DEFAULT_INTERVAL = int(os.getenv("CSV_IMPORT_INTERVAL", "5"))
 DG_ORDER = {"DG#1": 1, "DG#2": 2, "DG#3": 3, "ME-PORT": 4, "ME-STBD": 5}
 DG_PREFIXES = ("DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD", "ME_PORT", "ME_STBD", "PMS")
 DG_PREFIXES_NO_PMS = ("DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD", "ME_PORT", "ME_STBD")
+
+
+def normalize_dg_name(value: str) -> str:
+    normalized = str(value).strip()
+    if normalized.upper() in {"ME_PORT", "ME_STBD"}:
+        normalized = normalized.replace("_", "-")
+    return normalized
+
+
+def split_dg_name_from_label(label: str) -> tuple[str, str]:
+    normalized_label = str(label).strip()
+
+    for prefix in DG_PREFIXES_NO_PMS:
+        if normalized_label.startswith(prefix + " "):
+            return normalize_dg_name(prefix), normalized_label[len(prefix) + 1 :].strip()
+
+    if normalized_label.startswith("PMS "):
+        remainder = normalized_label[len("PMS ") :].strip()
+        for prefix in DG_PREFIXES_NO_PMS:
+            if remainder.startswith(prefix + " "):
+                return normalize_dg_name(prefix), remainder[len(prefix) + 1 :].strip()
+        return "PMS", remainder
+
+    return "", normalized_label
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -64,7 +88,10 @@ def parse_row(row: list[str]) -> tuple | None:
     except Exception:
         return None
 
-    if len(row) == 8:
+    if len(row) == 7:
+        imo, serial, addr, label, timestamp, val, unit = row
+        dg_name = ""
+    elif len(row) == 8:
         imo, serial, dg_name, addr, label, timestamp, val, unit = row
     elif len(row) >= 9:
         # Format like:
@@ -77,32 +104,20 @@ def parse_row(row: list[str]) -> tuple | None:
         return None
 
     label = str(label).strip()
-    dg_name = str(dg_name).strip()
+    dg_name = normalize_dg_name(str(dg_name).strip())
 
     if dg_name:
-        if dg_name.upper() in {"ME_PORT", "ME_STBD"}:
-            dg_name = dg_name.replace("_", "-")
-        label_variants = {dg_name}
-        if dg_name.upper().startswith("DG#"):
-            label_variants.add(dg_name.replace("#", ""))
-            label_variants.add(dg_name.replace("#", "-"))
-        if dg_name.upper() in {"ME-PORT", "ME-STBD"}:
-            label_variants.add(dg_name.replace("-", "_"))
-        for prefix in label_variants:
-            if label.startswith(prefix + " "):
-                label = label[len(prefix) + 1 :].strip()
-                break
-        if dg_name.upper() == "PMS":
-            for prefix in DG_PREFIXES_NO_PMS:
-                if label.startswith(prefix + " "):
-                    label = label[len(prefix) + 1 :].strip()
-                    break
+        detected_dg_name, stripped_label = split_dg_name_from_label(label)
+        if detected_dg_name == dg_name:
+            label = stripped_label
+        elif dg_name.upper() == "PMS":
+            if detected_dg_name and detected_dg_name != "PMS":
+                dg_name = detected_dg_name
+                label = stripped_label
+            elif label.startswith("PMS "):
+                label = label[len("PMS ") :].strip()
     else:
-        for prefix in DG_PREFIXES:
-            if label.startswith(prefix + " "):
-                dg_name = prefix.replace("ME_PORT", "ME-PORT").replace("ME_STBD", "ME-STBD")
-                label = label[len(prefix) + 1 :].strip()
-                break
+        dg_name, label = split_dg_name_from_label(label)
 
     if str(serial).strip() == "" or str(addr).strip() == "" or str(label).strip() == "":
         return None
@@ -125,17 +140,31 @@ def _sort_key(row: tuple) -> tuple:
     return (DG_ORDER.get(dg_name, 99), row[1], addr_key)
 
 
-def import_csv_file(path: Path, conn: sqlite3.Connection) -> int:
+def read_parsed_rows(path: Path) -> list[tuple]:
     parsed_rows: list[tuple] = []
+    non_empty_rows = 0
     with path.open("r", newline="", encoding="utf-8-sig") as handle:
         reader = csv.reader(handle)
         for row in reader:
+            if row and any(str(col).strip() for col in row):
+                non_empty_rows += 1
             parsed = parse_row(row)
             if not parsed:
                 continue
             parsed_rows.append(parsed)
 
+    if non_empty_rows > 0 and not parsed_rows:
+        raise ValueError(f"No importable rows found in {path.name}")
+
     parsed_rows.sort(key=_sort_key)
+    return parsed_rows
+
+
+def import_csv_file(path: Path, conn: sqlite3.Connection, replace_existing: bool = False) -> int:
+    parsed_rows = read_parsed_rows(path)
+
+    if replace_existing:
+        conn.execute("DELETE FROM live_engine_data;")
 
     conn.executemany(
         """
@@ -180,19 +209,22 @@ def run_once() -> None:
     if len(files) >= 2:
         newest = max(files, key=lambda p: p.stat().st_mtime)
         import_targets = [newest]
+    archive_candidates = [path for path in files if path not in import_targets]
 
     conn = sqlite3.connect(DB_PATH)
     try:
         ensure_schema(conn)
-        conn.execute("DELETE FROM live_engine_data;")
-        conn.commit()
+        successful_imports: list[Path] = []
+        replace_existing = True
         for csv_file in import_targets:
             try:
-                imported = import_csv_file(csv_file, conn)
+                imported = import_csv_file(csv_file, conn, replace_existing=replace_existing)
+                replace_existing = False
+                successful_imports.append(csv_file)
                 logging.info("Imported %s rows from %s", imported, csv_file.name)
             except Exception as exc:
                 logging.exception("Failed to import %s: %s", csv_file.name, exc)
-        for csv_file in files:
+        for csv_file in [*archive_candidates, *successful_imports]:
             try:
                 archived_path = move_to_archived(csv_file)
                 logging.info("Archived %s -> %s", csv_file.name, archived_path.name)
@@ -215,7 +247,7 @@ def run_watch(interval_seconds: int, stop_event: threading.Event) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Import CSV files from data/csv_received into live_engine_data.db"
+        description="Import CSV files from collector/csv_received into collector/live_engine_data.db"
     )
     parser.add_argument(
         "--once",

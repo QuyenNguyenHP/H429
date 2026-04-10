@@ -3,8 +3,8 @@ from pathlib import Path
 APP_NAME = "Engine Touchscreen API"
 APP_VERSION = "0.1.0"
 
-# backend/app -> project root -> data/live_engine_data.db
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "live_engine_data.db"
+# backend/app -> project root -> collector/live_engine_data.db
+DB_PATH = Path(__file__).resolve().parent.parent.parent / "collector" / "live_engine_data.db"
 DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
 
 ALARM_RULES = {

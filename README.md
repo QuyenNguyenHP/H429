@@ -7,7 +7,7 @@ A DG engine monitoring system that includes a backend API, frontend dashboards, 
 - `backend/` 🚀: FastAPI + SQLite API for live/trend/alarm/system data
 - `frontend/` 🌐: UI pages `index.html` (home) and `DGs_dashboard_V2.html` (DG detail)
 - `collector/` 📥: scripts for collecting and writing data to the database
-- `data/` 🗄️: stores `live_engine_data.db`
+- `collector/` 🗄️: stores `live_engine_data.db`
 
 ## 📁 Project Structure
 
@@ -34,7 +34,7 @@ engine-touchscreen-app/
   collector/
     modbus_collector.py
     data_collector.py
-  data/
+  collector/
     live_engine_data.db
   README.md
 ```
@@ -138,7 +138,7 @@ WantedBy=multi-user.target
 Lưu ý:
 
 - Không dùng `python run.py` trong production vì file này đang bật `reload=True`.
-- Database SQLite đang được backend đọc từ `data/live_engine_data.db` ở thư mục gốc project.
+- Database SQLite đang được backend đọc từ `collector/live_engine_data.db`.
 
 ### 3) Tạo service cho frontend
 
@@ -207,7 +207,7 @@ Frontend hiện tự gọi API theo hostname hiện tại với cổng `8000`, n
 
 ## 🛠️ Important Notes
 
-- `data/live_engine_data.db` is the shared data source for backend and collector.
+- `collector/live_engine_data.db` is the shared data source for backend and collector.
 - Current frontend favicon: `frontend/Asset/DRUMS_logo_small.png` 🏷️
 - `alarms/history` is currently a placeholder implementation.
 

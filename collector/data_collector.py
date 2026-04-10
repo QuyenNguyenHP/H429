@@ -31,7 +31,7 @@ DG3_SLAVE_ID = 16
 DG3_Name = "DG#3"
 DG3_SerialNo = "DE618Z5180"
 
-LIVE_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "live_engine_data.db"
+LIVE_DB_PATH = Path(__file__).resolve().parent / "live_engine_data.db"
 LIVE_DATA_STORE = None
 
 
@@ -440,5 +440,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 

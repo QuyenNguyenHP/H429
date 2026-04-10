@@ -17,11 +17,11 @@ This module collects live generator data from Modbus devices and stores it into 
 In `data_collector.py`, the DB path is configured as:
 
 ```python
-LIVE_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "live_engine_data.db"
+LIVE_DB_PATH = Path(__file__).resolve().parent / "live_engine_data.db"
 ```
 
 This means data is written to:
-- `engine-touchscreen-app/data/live_engine_data.db`
+- `engine-touchscreen-app/collector/live_engine_data.db`
 
 ## 🧱 Table Used
 The collector writes into table:
@@ -67,7 +67,7 @@ Edit these values in `data_collector.py` as needed:
 
 ## 📤 Output
 - CSV files in current working directory (prefix like `H429_...csv`)
-- SQLite updates in `data/live_engine_data.db`
+- SQLite updates in `collector/live_engine_data.db`
 
 ### Disable CSV to avoid frontend auto-reload flicker
 If you run frontend with a live-reload server, frequent CSV writes can trigger full page reloads.
