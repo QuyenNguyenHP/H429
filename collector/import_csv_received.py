@@ -7,6 +7,7 @@ import shutil
 import signal
 import sqlite3
 import threading
+import zipfile
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -194,6 +195,47 @@ def move_to_archived(path: Path) -> Path:
     return destination
 
 
+def list_received_data_files() -> list[Path]:
+    csv_files = list(RECEIVED_DIR.glob("*.csv"))
+    zip_files = list(RECEIVED_DIR.glob("*.zip"))
+    return [p for p in [*csv_files, *zip_files] if p.is_file()]
+
+
+def extract_csv_from_zip(zip_path: Path) -> Path:
+    extracted_dir = RECEIVED_DIR / "_tmp_extracted"
+    extracted_dir.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        csv_members = [info for info in zf.infolist() if not info.is_dir() and info.filename.lower().endswith(".csv")]
+        if not csv_members:
+            raise ValueError(f"No CSV file found inside zip: {zip_path.name}")
+
+        newest_member = max(csv_members, key=lambda info: info.date_time)
+        extracted_path = Path(zf.extract(newest_member, path=extracted_dir))
+    return extracted_path
+
+
+def cleanup_received_dir() -> None:
+    for pattern in ("*.csv", "*.zip"):
+        for path in RECEIVED_DIR.glob(pattern):
+            if not path.is_file():
+                continue
+            try:
+                path.unlink()
+                logging.info("Deleted leftover file: %s", path.name)
+            except Exception as exc:
+                logging.exception("Failed to delete %s: %s", path.name, exc)
+
+
+def cleanup_extracted_tmp_dir() -> None:
+    extracted_dir = RECEIVED_DIR / "_tmp_extracted"
+    if extracted_dir.exists():
+        try:
+            shutil.rmtree(extracted_dir)
+        except Exception as exc:
+            logging.exception("Failed to cleanup temp extraction dir %s: %s", extracted_dir, exc)
+
+
 def run_once() -> None:
     RECEIVED_DIR.mkdir(parents=True, exist_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -202,36 +244,37 @@ def run_once() -> None:
         logging.warning("Missing folder: %s", RECEIVED_DIR)
         return
 
-    files = sorted(RECEIVED_DIR.glob("*.csv"))
+    files = list_received_data_files()
     if not files:
         return
-    import_targets = files
-    if len(files) >= 2:
-        newest = max(files, key=lambda p: p.stat().st_mtime)
-        import_targets = [newest]
-    archive_candidates = [path for path in files if path not in import_targets]
+
+    newest = max(files, key=lambda p: p.stat().st_mtime)
+    logging.info("Selected newest file: %s", newest.name)
 
     conn = sqlite3.connect(DB_PATH)
+    import_source: Path | None = None
+    import_csv_path: Path | None = None
+    import_and_archive_ok = False
     try:
         ensure_schema(conn)
-        successful_imports: list[Path] = []
-        replace_existing = True
-        for csv_file in import_targets:
-            try:
-                imported = import_csv_file(csv_file, conn, replace_existing=replace_existing)
-                replace_existing = False
-                successful_imports.append(csv_file)
-                logging.info("Imported %s rows from %s", imported, csv_file.name)
-            except Exception as exc:
-                logging.exception("Failed to import %s: %s", csv_file.name, exc)
-        for csv_file in [*archive_candidates, *successful_imports]:
-            try:
-                archived_path = move_to_archived(csv_file)
-                logging.info("Archived %s -> %s", csv_file.name, archived_path.name)
-            except Exception as exc:
-                logging.exception("Failed to archive %s: %s", csv_file.name, exc)
+        import_source = newest
+        if newest.suffix.lower() == ".zip":
+            import_csv_path = extract_csv_from_zip(newest)
+            logging.info("Extracted CSV %s from %s", import_csv_path.name, newest.name)
+        else:
+            import_csv_path = newest
+
+        imported = import_csv_file(import_csv_path, conn, replace_existing=True)
+        logging.info("Imported %s rows from %s", imported, import_csv_path.name)
+
+        archived_path = move_to_archived(import_source)
+        logging.info("Archived %s -> %s", import_source.name, archived_path.name)
+        import_and_archive_ok = True
     finally:
         conn.close()
+        if import_and_archive_ok:
+            cleanup_received_dir()
+        cleanup_extracted_tmp_dir()
 
 
 def run_watch(interval_seconds: int, stop_event: threading.Event) -> None:

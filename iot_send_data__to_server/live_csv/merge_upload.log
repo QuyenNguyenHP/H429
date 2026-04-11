@@ -318,3 +318,9 @@ scp: failed to upload file /mnt/c/Users/Quyen PC/Desktop/My Repo/H429/iot_send_d
 [2026-04-11 12:31:14] [INFO] ℹ️ Merged 6 files with 361 rows into H429_merged_20260411_123114.csv
 [2026-04-11 12:31:14] [INFO] ℹ️ Upload success: H429_merged_20260411_123114.csv -> nguyen@218.212.167.168:~/H429/collector/csv_received/
 [2026-04-11 12:31:14] [INFO] ℹ️ Delete success after upload: removed 7 local CSV files
+[2026-04-11 13:50:07] [INFO] ℹ️ Start merge for 6 source CSV files into H429_merged_20260411_135007.csv
+[2026-04-11 13:50:07] [INFO] ℹ️ Merged 6 files with 361 rows into H429_merged_20260411_135007.csv
+[2026-04-11 13:50:07] [INFO] ℹ️ Create zip archive from H429_merged_20260411_135007.csv
+[2026-04-11 13:50:07] [INFO] ℹ️ Zip created: H429_merged_20260411_135007.zip
+[2026-04-11 13:50:07] [INFO] ℹ️ Upload success: H429_merged_20260411_135007.zip -> nguyen@218.212.167.168:~/H429/collector/csv_received/
+[2026-04-11 13:50:07] [INFO] ℹ️ Delete success after upload: removed 8 local CSV files

@@ -8,6 +8,7 @@ import datetime
 import subprocess
 from pathlib import Path
 import shutil
+import zipfile
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
 import struct
@@ -772,6 +773,13 @@ def _merge_csv_files(csv_files, merged_path):
     return row_count
 
 
+def _zip_csv_file(csv_path):
+    zip_path = csv_path.with_suffix(".zip")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(csv_path, arcname=csv_path.name)
+    return zip_path
+
+
 def _scp_file(local_path, remote_target):
     if shutil.which("scp") is None:
         raise RuntimeError("Command 'scp' not found on this machine.")
@@ -807,6 +815,7 @@ async def merge_and_scp_live_csv():
         return
 
     merged_csv_path = await asyncio.to_thread(_build_merged_csv_path)
+    merged_zip_path = merged_csv_path.with_suffix(".zip")
     upload_ok = False
     phase_error = None
 
@@ -822,29 +831,42 @@ async def merge_and_scp_live_csv():
             "INFO",
             f"Merged {len(csv_files)} files with {row_count} rows into {merged_csv_path.name}",
         )
+        await asyncio.to_thread(
+            _log_merge_upload,
+            "INFO",
+            f"Create zip archive from {merged_csv_path.name}",
+        )
+        merged_zip_path = await asyncio.to_thread(_zip_csv_file, merged_csv_path)
+        await asyncio.to_thread(
+            _log_merge_upload,
+            "INFO",
+            f"Zip created: {merged_zip_path.name}",
+        )
     except Exception as exc:
         phase_error = ("merge", exc)
 
     if phase_error is None:
         try:
-            await asyncio.to_thread(_scp_file, merged_csv_path, SCP_REMOTE_TARGET)
+            await asyncio.to_thread(_scp_file, merged_zip_path, SCP_REMOTE_TARGET)
             upload_ok = True
             await asyncio.to_thread(
                 _log_merge_upload,
                 "INFO",
-                f"Upload success: {merged_csv_path.name} -> {SCP_REMOTE_TARGET}",
+                f"Upload success: {merged_zip_path.name} -> {SCP_REMOTE_TARGET}",
             )
         except Exception as exc:
             phase_error = ("upload", exc)
             await asyncio.to_thread(
                 _log_merge_upload,
                 "ERROR",
-                f"Upload failed: {merged_csv_path.name} -> {SCP_REMOTE_TARGET}. Error: {exc}",
+                f"Upload failed: {merged_zip_path.name} -> {SCP_REMOTE_TARGET}. Error: {exc}",
             )
 
     delete_targets = list(csv_files)
     if merged_csv_path.exists():
         delete_targets.append(merged_csv_path)
+    if merged_zip_path.exists():
+        delete_targets.append(merged_zip_path)
     deleted_count = 0
     delete_errors = []
     for csv_path in delete_targets:
