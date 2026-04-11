@@ -14,42 +14,43 @@ import struct
 
 IMO_NO = "1114389"
 
-CSV_SOURCE_DIR = Path("/home/duyquyen/live_csv")
+BASE_DIR = Path(__file__).resolve().parent
+CSV_SOURCE_DIR = BASE_DIR / "live_csv"
 CSV_LOG_PREFIX = str(CSV_SOURCE_DIR / "H429_")
-CSV_UPLOADED_DIR = Path("/home/duyquyen/csv_uploaded")
 MERGED_FILE_PREFIX = "H429_merged_"
 MERGE_UPLOAD_LOG_PATH = CSV_SOURCE_DIR / "merge_upload.log"
-SCP_REMOTE_TARGET = "root@31.97.189.234:~/H429/data/csv_received/"
+SCP_REMOTE_TARGET = "nguyen@218.212.167.168:~/H429/collector/csv_received/"
+MAIN_LOOP_SLEEP_SECONDS = 10
 
 LAST_MERGE_SIGNATURE = None
 
 
-ME_PORT_IP = "192.168.10.141"
+ME_PORT_IP = "192.168.18.26"
 ME_PORT_SLAVE_ID = 1
 ME_PORT_Name = "ME_PORT"
 ME_PORT_SerialNo = "DK636E0039"
 
-ME_STBD_IP = "192.168.10.141"
+ME_STBD_IP = "192.168.18.26"
 ME_STBD_SLAVE_ID = 1
 ME_STBD_Name = "ME_STBD"
 ME_STBD_SerialNo = "DK636E0038"
 
-DG1_IP = "192.168.10.141"
+DG1_IP = "192.168.18.26"
 DG1_SLAVE_ID = 1
 DG1_Name = "DG#1"
 DG1_SerialNo = "DE618Z5178"
 
-DG2_IP = "192.168.10.141"
+DG2_IP = "192.168.18.26"
 DG2_SLAVE_ID = 2
 DG2_Name = "DG#2"
 DG2_SerialNo = "DE618Z4812"
 
-DG3_IP = "192.168.10.141"
+DG3_IP = "192.168.18.26"
 DG3_SLAVE_ID = 1
 DG3_Name = "DG#3"
 DG3_SerialNo = "DE618Z4863"
 
-PMS_IP = "192.168.10.141"
+PMS_IP = "192.168.18.26"
 PMS_SLAVE_ID = 3
 PMS_Name = "PMS"
 PMS_SerialNo = " "
@@ -77,7 +78,7 @@ async def read_modbus_data_DG(DG, slave_id, dg_name, imo, serial):
             writer = csv.writer(f)
 
             # ========== ANALOG ==========
-            print(f"\nâœ… {dg_name} Analog Signal")
+            print(f"\n✅ {dg_name} Analog Signal")
             analog_map = {
                 #0x01: (f"{dg_name} FUEL OIL TEMPERATURE ENGINE INLET", "deg C", 1),
                 #0x02: (f"{dg_name} BOOST AIR TEMPERATURE", "deg C", 1),
@@ -133,12 +134,12 @@ async def read_modbus_data_DG(DG, slave_id, dg_name, imo, serial):
                         ])
 
             else:
-                print(f"âŒ Error reading analog registers from {dg_name}")
+                print(f"⚠️ Error reading analog registers from {dg_name}")
                 flag = True
 
 
             # ---------------- DISCRETE ----------------
-            print(f"\nâœ… {dg_name} Digital Signal")
+            print(f"\n✅ {dg_name} Digital Signal")
             discrete_map = {
                 0x01: (f"{dg_name} LUB OIL FILTER DIFFERENTIAL PRESSURE HIGH", "On/Off",),
                 0x02: (f"{dg_name} CONTROL AIR PRESSURE LOW", "On/Off",),
@@ -250,13 +251,13 @@ async def read_modbus_data_DG(DG, slave_id, dg_name, imo, serial):
                             unit
                         ])
             else:
-                print(f"âŒ Error reading Digital registers from {dg_name}")
+                print(f"⚠️ Error reading Digital registers from {dg_name}")
                 flag = True
         if flag == False:
-            print(f"\n=== âœ… WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
+            print(f"\n=== ✅ WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
 
     except Exception as e:
-        print(f"âŒ Error in read_modbus_data for {dg_name}: {e}")
+        print(f"⚠️ Error in read_modbus_data for {dg_name}: {e}")
         traceback.print_exc()
         await asyncio.sleep(0.1)
 
@@ -269,7 +270,7 @@ async def read_modbus_data_PORT(ME, slave_id, dg_name, imo, serial):
             writer = csv.writer(f)
 
             # ========== ANALOG ==========
-            print(f"\nâœ… {dg_name} Analog Signal")
+            print(f"\n✅ {dg_name} Analog Signal")
             analog_map = {
                 0x01: (f"{dg_name} BOOST AIR PRESS.", "Mpa", 0.01),
                 0x02: (f"{dg_name} FUEL OIL PRESS.", "Mpa", 0.01),
@@ -330,12 +331,12 @@ async def read_modbus_data_PORT(ME, slave_id, dg_name, imo, serial):
                             unit
                         ])
             else:    
-                print(f"âŒ Error reading analog registers from {dg_name}")
+                print(f"⚠️ Error reading analog registers from {dg_name}")
                 flag = True
 
 
             # ---------------- DISCRETE ----------------
-            print(f"\nâœ… {dg_name} Digital Signal")
+            print(f"\n✅ {dg_name} Digital Signal")
             discrete_map = {
                 0x01: (f"{dg_name} MAIN (AC) SOURCE", "On/Off"),
                 0x02: (f"{dg_name} EMERG. (DC) SOURCE", "On/Off"),
@@ -427,13 +428,13 @@ async def read_modbus_data_PORT(ME, slave_id, dg_name, imo, serial):
                             unit
                         ])
             else:
-                print(f"âŒ Error reading Digital registers from {dg_name}")
+                print(f"⚠️ Error reading Digital registers from {dg_name}")
                 flag = True
         if flag == False:
-            print(f"\n=== âœ… WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
+            print(f"\n=== ✅ WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
 
     except Exception as e:
-        print(f"âŒ Error in read_modbus_data for {dg_name}: {e}")
+        print(f"⚠️ Error in read_modbus_data for {dg_name}: {e}")
         traceback.print_exc()
         await asyncio.sleep(0.1)
 async def read_modbus_data_STBD(ME, slave_id, dg_name, imo, serial):
@@ -446,7 +447,7 @@ async def read_modbus_data_STBD(ME, slave_id, dg_name, imo, serial):
             writer = csv.writer(f)
 
             # ========== ANALOG ==========
-            print(f"\nâœ… {dg_name} Analog Signal")
+            print(f"\n✅ {dg_name} Analog Signal")
             analog_map = {
                 0x16: (f"{dg_name} BOOST AIR PRESS.", "Mpa", 0.01),
                 0x17: (f"{dg_name} FUEL OIL PRESS.", "Mpa", 0.01),
@@ -505,12 +506,12 @@ async def read_modbus_data_STBD(ME, slave_id, dg_name, imo, serial):
                         ])
 
             else:
-                print(f"âŒ Error reading analog registers from {dg_name}")
+                print(f"⚠️ Error reading analog registers from {dg_name}")
                 flag = True
 
 
             # ---------------- DISCRETE ----------------
-            print(f"\nâœ… {dg_name} Digital Signal")
+            print(f"\n✅ {dg_name} Digital Signal")
             discrete_map = {
                 0x3E: (f"{dg_name} NO.2 START AIR PRESS.", "On/Off"),
 
@@ -603,13 +604,13 @@ async def read_modbus_data_STBD(ME, slave_id, dg_name, imo, serial):
                             unit
                         ])
             else:
-                print(f"âŒ Error reading Digital registers from {dg_name}")
+                print(f"⚠️ Error reading Digital registers from {dg_name}")
                 flag = True
         if flag == False:
-            print(f"\n=== âœ… WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
+            print(f"\n=== ✅ WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
 
     except Exception as e:
-        print(f"âŒ Error in read_modbus_data for {dg_name}: {e}")
+        print(f"⚠️ Error in read_modbus_data for {dg_name}: {e}")
         traceback.print_exc()
         await asyncio.sleep(0.1)
 
@@ -658,7 +659,7 @@ async def read_modbus_data_PMS(PMS, slave_id, dg_name, imo):
                     if val is None:
                         continue
                     #val = round(val)
-                    val *= ratio  # âœ… apply scaling
+                    val *= ratio  # ✅ apply scaling
                     print(f"{label:<50}: {val} {unit}")
                     writer.writerow([
                         imo,
@@ -672,13 +673,13 @@ async def read_modbus_data_PMS(PMS, slave_id, dg_name, imo):
 
 
             else:
-                print(f"Error reading analog registers from {dg_name}")
+                print(f"⚠️ Error reading analog registers from {dg_name}")
                 flag = True
         if flag == False:
             print(f"\n=== WRITE {dg_name} DATA TO CSV SUCCESSFULLY")
 
     except Exception as e:
-        print(f"??O Error in read_modbus_data for {dg_name}: {e}")
+        print(f"⚠️ Error in read_modbus_data for {dg_name}: {e}")
         traceback.print_exc()
         await asyncio.sleep(0.1)
 
@@ -689,21 +690,21 @@ async def connect_client(client, address, retries=2, timeout=2, delay=1):
     Returns True if connected, False if not.
     """
     for attempt in range(1, retries + 1):
-        print(f"ðŸ”Œ Connecting to {address} (try {attempt}/{retries})...")
+        print(f"🔌 Connecting to {address} (try {attempt}/{retries})...")
         try:
             await asyncio.wait_for(client.connect(), timeout=timeout)
         except asyncio.TimeoutError:
-            print(f"â³ Timeout: {address} didnâ€™t respond in {timeout}s")
+            print(f"⏳ Timeout: {address} did not respond in {timeout}s")
         except Exception as e:
-            print(f"âŒ Connect error to {address}: {e}")
+            print(f"❌ Connect error to {address}: {e}")
 
         if client.connected:
-            print(f"âœ… Connected {address}")
+            print(f"✅ Connected {address}")
             return True
 
         await asyncio.sleep(delay)  # wait before retry
 
-    print(f"âš  Could not connect to {address} after {retries} tries â†’ skip")
+    print(f"⚠️ Could not connect to {address} after {retries} tries -> skip")
     return False
 
 
@@ -715,7 +716,7 @@ async def monitor_connection(client, address, retries=2, timeout=3):
     backoff = 1
     while True:
         if not client.connected:
-            print(f"âš  Lost {address}, reconnecting...")
+            print(f"⚠️ Lost {address}, reconnecting...")
 
             ok = await connect_client(client, address, retries=retries, timeout=timeout, delay=backoff)
             if not ok:
@@ -746,7 +747,12 @@ def _build_merged_csv_path():
 def _log_merge_upload(level, message):
     CSV_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_line = f"[{timestamp}] [{level}] {message}"
+    level_emoji = {
+        "INFO": "ℹ️",
+        "WARNING": "⚠️",
+        "ERROR": "❌",
+    }.get(level, "📝")
+    log_line = f"[{timestamp}] [{level}] {level_emoji} {message}"
     print(log_line)
     with open(MERGE_UPLOAD_LOG_PATH, "a", newline="") as log_file:
         log_file.write(log_line + "\n")
@@ -788,16 +794,6 @@ def _scp_file(local_path, remote_target):
         raise RuntimeError(msg)
 
 
-def _move_to_uploaded(local_path):
-    CSV_UPLOADED_DIR.mkdir(parents=True, exist_ok=True)
-    destination = CSV_UPLOADED_DIR / local_path.name
-    if destination.exists():
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        destination = CSV_UPLOADED_DIR / f"{local_path.stem}_{timestamp}{local_path.suffix}"
-    shutil.move(str(local_path), str(destination))
-    return destination
-
-
 async def merge_and_scp_live_csv():
     global LAST_MERGE_SIGNATURE
 
@@ -811,6 +807,9 @@ async def merge_and_scp_live_csv():
         return
 
     merged_csv_path = await asyncio.to_thread(_build_merged_csv_path)
+    upload_ok = False
+    phase_error = None
+
     try:
         await asyncio.to_thread(
             _log_merge_upload,
@@ -823,27 +822,68 @@ async def merge_and_scp_live_csv():
             "INFO",
             f"Merged {len(csv_files)} files with {row_count} rows into {merged_csv_path.name}",
         )
-        await asyncio.to_thread(_scp_file, merged_csv_path, SCP_REMOTE_TARGET)
-        await asyncio.to_thread(
-            _log_merge_upload,
-            "INFO",
-            f"Uploaded {merged_csv_path.name} to {SCP_REMOTE_TARGET}",
-        )
-        archived_paths = []
-        for csv_path in [*csv_files, merged_csv_path]:
-            archived_path = await asyncio.to_thread(_move_to_uploaded, csv_path)
-            archived_paths.append(archived_path.name)
-        await asyncio.to_thread(
-            _log_merge_upload,
-            "INFO",
-            f"Archived {len(archived_paths)} CSV files to {CSV_UPLOADED_DIR}",
-        )
-        LAST_MERGE_SIGNATURE = signature
     except Exception as exc:
-        if merged_csv_path.exists():
-            merged_csv_path.unlink()
-        await asyncio.to_thread(_log_merge_upload, "ERROR", f"Merge/upload failed: {exc}")
-        raise
+        phase_error = ("merge", exc)
+
+    if phase_error is None:
+        try:
+            await asyncio.to_thread(_scp_file, merged_csv_path, SCP_REMOTE_TARGET)
+            upload_ok = True
+            await asyncio.to_thread(
+                _log_merge_upload,
+                "INFO",
+                f"Upload success: {merged_csv_path.name} -> {SCP_REMOTE_TARGET}",
+            )
+        except Exception as exc:
+            phase_error = ("upload", exc)
+            await asyncio.to_thread(
+                _log_merge_upload,
+                "ERROR",
+                f"Upload failed: {merged_csv_path.name} -> {SCP_REMOTE_TARGET}. Error: {exc}",
+            )
+
+    delete_targets = list(csv_files)
+    if merged_csv_path.exists():
+        delete_targets.append(merged_csv_path)
+    deleted_count = 0
+    delete_errors = []
+    for csv_path in delete_targets:
+        try:
+            await asyncio.to_thread(csv_path.unlink)
+            deleted_count += 1
+        except Exception as delete_exc:
+            delete_errors.append(f"{csv_path.name}: {delete_exc}")
+
+    if delete_errors:
+        await asyncio.to_thread(
+            _log_merge_upload,
+            "ERROR",
+            "Delete failed for some local CSV files: " + " | ".join(delete_errors),
+        )
+    else:
+        if upload_ok:
+            await asyncio.to_thread(
+                _log_merge_upload,
+                "INFO",
+                f"Delete success after upload: removed {deleted_count} local CSV files",
+            )
+        else:
+            await asyncio.to_thread(
+                _log_merge_upload,
+                "WARNING",
+                f"Upload not successful, but deleted {deleted_count} local CSV files",
+            )
+
+    if phase_error is None and not delete_errors:
+        LAST_MERGE_SIGNATURE = signature
+        return
+
+    LAST_MERGE_SIGNATURE = None
+    phase_name, phase_exc = phase_error if phase_error is not None else ("cleanup", "delete errors")
+    raise RuntimeError(
+        f"{phase_name.capitalize()} failed: {phase_exc}. "
+        f"Deleted {deleted_count}/{len(delete_targets)} local CSV files."
+    )
 
 
 async def main():
@@ -880,20 +920,20 @@ async def main():
                     try:
                         await reader_func(client, *args)
                     except Exception as e:
-                        print(f"Error reading {ip}: {e}")
+                        print(f"❌ Error reading {ip}: {e}")
                         traceback.print_exc()
             try:
                 await merge_and_scp_live_csv()
             except Exception as e:
                 print(f"❌ Merge/SCP error: {e}")
-            print("\n=== âœ… WAITING 30s ===")
-            await asyncio.sleep(30)
+            print(f"\n=== ⏱️ WAITING {MAIN_LOOP_SLEEP_SECONDS}s ===")
+            await asyncio.sleep(MAIN_LOOP_SLEEP_SECONDS)
 
     finally:
-        print("ðŸ”» Closing clients...")
+        print("🔻 Closing clients...")
         for client, _, _, _ in clients:
             await client.close()
-        print("âœ… All clients closed.")
+        print("✅ All clients closed.")
 
 
 if __name__ == "__main__":
