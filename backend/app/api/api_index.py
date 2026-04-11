@@ -83,8 +83,45 @@ def _build_status(rows, dg_name: str) -> dict:
     }
 
 
-def _get_digital_rows(db: Session):
-    rows = get_latest_all(db)
+def _build_status_me(rows, dg_name: str) -> dict:
+    dg_rows = [r for r in rows if (r.dg_name or "").strip() == dg_name]
+    dg_digital_rows = [
+        r for r in dg_rows if (r.unit or "").strip().lower() == "on/off"
+    ]
+    dg_analog_rows = [
+        r for r in dg_rows if (r.unit or "").strip().lower() != "on/off"
+    ]
+
+    run_point = next(
+        (r for r in dg_digital_rows if (r.label or "").strip().upper() == "ENGINE RUN"),
+        None,
+    )
+    me_rev_point = next(
+        (r for r in dg_analog_rows if (r.label or "").strip().upper() == "M/E REVOLUTION"),
+        None,
+    )
+    me_rev_value = None
+    if me_rev_point is not None and me_rev_point.value is not None:
+        try:
+            me_rev_value = float(me_rev_point.value)
+        except (TypeError, ValueError):
+            me_rev_value = None
+
+    running = _is_on_value(run_point.value) if run_point else False
+    running = running or (me_rev_value is not None and me_rev_value > 0)
+    has_alarm = any(_is_on_value(r.value) for r in dg_digital_rows)
+    has_data = len(dg_rows) > 0
+    ready = has_data and not running and not has_alarm
+
+    return {
+        "ready": ready,
+        "running": running,
+        "alarm": has_alarm,
+        "has_data": has_data,
+    }
+
+
+def _get_digital_rows(rows):
     return [
         r
         for r in rows
@@ -94,7 +131,8 @@ def _get_digital_rows(db: Session):
 
 @router.get("/DG#1")
 def dg1_index(db: Session = Depends(get_db)):
-    digital_rows = _get_digital_rows(db)
+    all_rows = get_latest_all(db)
+    digital_rows = _get_digital_rows(all_rows)
     return {
         "dg_name": "DG#1",
         "status": _build_status(digital_rows, "DG#1"),
@@ -107,7 +145,8 @@ def dg1_index(db: Session = Depends(get_db)):
 
 @router.get("/DG#2")
 def dg2_index(db: Session = Depends(get_db)):
-    digital_rows = _get_digital_rows(db)
+    all_rows = get_latest_all(db)
+    digital_rows = _get_digital_rows(all_rows)
     return {
         "dg_name": "DG#2",
         "status": _build_status(digital_rows, "DG#2"),
@@ -120,7 +159,8 @@ def dg2_index(db: Session = Depends(get_db)):
 
 @router.get("/DG#3")
 def dg3_index(db: Session = Depends(get_db)):
-    digital_rows = _get_digital_rows(db)
+    all_rows = get_latest_all(db)
+    digital_rows = _get_digital_rows(all_rows)
     return {
         "dg_name": "DG#3",
         "status": _build_status(digital_rows, "DG#3"),
@@ -133,17 +173,17 @@ def dg3_index(db: Session = Depends(get_db)):
 
 @router.get("/ME-PORT")
 def me_port_index(db: Session = Depends(get_db)):
-    digital_rows = _get_digital_rows(db)
+    all_rows = get_latest_all(db)
     return {
         "dg_name": "ME-PORT",
-        "status": _build_status(digital_rows, "ME-PORT"),
+        "status": _build_status_me(all_rows, "ME-PORT"),
     }
 
 
 @router.get("/ME-STBD")
 def me_stbd_index(db: Session = Depends(get_db)):
-    digital_rows = _get_digital_rows(db)
+    all_rows = get_latest_all(db)
     return {
         "dg_name": "ME-STBD",
-        "status": _build_status(digital_rows, "ME-STBD"),
+        "status": _build_status_me(all_rows, "ME-STBD"),
     }
