@@ -9,6 +9,8 @@ import subprocess
 from pathlib import Path
 import shutil
 import zipfile
+import os
+import getpass
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
 import struct
@@ -22,6 +24,10 @@ MERGED_FILE_PREFIX = "H429_merged_"
 MERGE_UPLOAD_LOG_PATH = CSV_SOURCE_DIR / "merge_upload.log"
 SCP_REMOTE_TARGET = "nguyen@218.212.167.168:~/H429/collector/csv_received/"
 MAIN_LOOP_SLEEP_SECONDS = 10
+SCP_UPLOAD_RETRIES = 3
+SCP_UPLOAD_RETRY_DELAY_SECONDS = 2
+SCP_USER_KNOWN_HOSTS = os.getenv("SCP_USER_KNOWN_HOSTS", "/home/drums/.ssh/known_hosts")
+SCP_STRICT_HOST_KEY_CHECKING = os.getenv("SCP_STRICT_HOST_KEY_CHECKING", "accept-new")
 
 LAST_MERGE_SIGNATURE = None
 
@@ -786,11 +792,14 @@ def _scp_file(local_path, remote_target):
 
     cmd = [
         "scp",
-        "-q",
         "-o",
         "BatchMode=yes",
         "-o",
         "ConnectTimeout=10",
+        "-o",
+        f"UserKnownHostsFile={SCP_USER_KNOWN_HOSTS}",
+        "-o",
+        f"StrictHostKeyChecking={SCP_STRICT_HOST_KEY_CHECKING}",
         str(local_path),
         remote_target,
     ]
@@ -798,7 +807,15 @@ def _scp_file(local_path, remote_target):
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
         stdout = (result.stdout or "").strip()
-        msg = stderr or stdout or f"scp failed with exit code {result.returncode}"
+        current_user = getpass.getuser()
+        current_home = str(Path.home())
+        known_hosts_exists = Path(SCP_USER_KNOWN_HOSTS).exists()
+        msg = (
+            f"scp failed with exit code {result.returncode}. "
+            f"cmd={' '.join(cmd)} | user={current_user} | home={current_home} | "
+            f"known_hosts={SCP_USER_KNOWN_HOSTS} (exists={known_hosts_exists}) | "
+            f"stdout={stdout or '<empty>'} | stderr={stderr or '<empty>'}"
+        )
         raise RuntimeError(msg)
 
 
@@ -846,65 +863,80 @@ async def merge_and_scp_live_csv():
         phase_error = ("merge", exc)
 
     if phase_error is None:
-        try:
-            await asyncio.to_thread(_scp_file, merged_zip_path, SCP_REMOTE_TARGET)
-            upload_ok = True
-            await asyncio.to_thread(
-                _log_merge_upload,
-                "INFO",
-                f"Upload success: {merged_zip_path.name} -> {SCP_REMOTE_TARGET}",
-            )
-        except Exception as exc:
-            phase_error = ("upload", exc)
+        for attempt in range(1, SCP_UPLOAD_RETRIES + 1):
+            try:
+                await asyncio.to_thread(_scp_file, merged_zip_path, SCP_REMOTE_TARGET)
+                upload_ok = True
+                await asyncio.to_thread(
+                    _log_merge_upload,
+                    "INFO",
+                    f"Upload success (attempt {attempt}/{SCP_UPLOAD_RETRIES}): "
+                    f"{merged_zip_path.name} -> {SCP_REMOTE_TARGET}",
+                )
+                break
+            except Exception as exc:
+                await asyncio.to_thread(
+                    _log_merge_upload,
+                    "ERROR",
+                    f"Upload failed (attempt {attempt}/{SCP_UPLOAD_RETRIES}): "
+                    f"{merged_zip_path.name} -> {SCP_REMOTE_TARGET}. Error: {exc}",
+                )
+                if attempt < SCP_UPLOAD_RETRIES:
+                    await asyncio.to_thread(
+                        _log_merge_upload,
+                        "WARNING",
+                        f"Retry upload after {SCP_UPLOAD_RETRY_DELAY_SECONDS}s...",
+                    )
+                    await asyncio.sleep(SCP_UPLOAD_RETRY_DELAY_SECONDS)
+                else:
+                    phase_error = ("upload", exc)
+
+    deleted_count = 0
+    delete_errors = []
+    if upload_ok:
+        delete_targets = list(csv_files)
+        if merged_csv_path.exists():
+            delete_targets.append(merged_csv_path)
+        if merged_zip_path.exists():
+            delete_targets.append(merged_zip_path)
+
+        for csv_path in delete_targets:
+            try:
+                await asyncio.to_thread(csv_path.unlink)
+                deleted_count += 1
+            except Exception as delete_exc:
+                delete_errors.append(f"{csv_path.name}: {delete_exc}")
+
+        if delete_errors:
             await asyncio.to_thread(
                 _log_merge_upload,
                 "ERROR",
-                f"Upload failed: {merged_zip_path.name} -> {SCP_REMOTE_TARGET}. Error: {exc}",
-            )
-
-    delete_targets = list(csv_files)
-    if merged_csv_path.exists():
-        delete_targets.append(merged_csv_path)
-    if merged_zip_path.exists():
-        delete_targets.append(merged_zip_path)
-    deleted_count = 0
-    delete_errors = []
-    for csv_path in delete_targets:
-        try:
-            await asyncio.to_thread(csv_path.unlink)
-            deleted_count += 1
-        except Exception as delete_exc:
-            delete_errors.append(f"{csv_path.name}: {delete_exc}")
-
-    if delete_errors:
-        await asyncio.to_thread(
-            _log_merge_upload,
-            "ERROR",
-            "Delete failed for some local CSV files: " + " | ".join(delete_errors),
-        )
-    else:
-        if upload_ok:
-            await asyncio.to_thread(
-                _log_merge_upload,
-                "INFO",
-                f"Delete success after upload: removed {deleted_count} local CSV files",
+                "Delete failed for some local CSV files: " + " | ".join(delete_errors),
             )
         else:
             await asyncio.to_thread(
                 _log_merge_upload,
-                "WARNING",
-                f"Upload not successful, but deleted {deleted_count} local CSV files",
+                "INFO",
+                f"Delete success after upload: removed {deleted_count} local CSV/ZIP files",
             )
+    else:
+        await asyncio.to_thread(
+            _log_merge_upload,
+            "WARNING",
+            "Upload not successful; keep all local CSV/ZIP files for next retry",
+        )
 
     if phase_error is None and not delete_errors:
         LAST_MERGE_SIGNATURE = signature
         return
 
     LAST_MERGE_SIGNATURE = None
+    if not upload_ok:
+        raise RuntimeError(f"Upload failed after {SCP_UPLOAD_RETRIES} attempts: {phase_error[1]}")
     phase_name, phase_exc = phase_error if phase_error is not None else ("cleanup", "delete errors")
     raise RuntimeError(
         f"{phase_name.capitalize()} failed: {phase_exc}. "
-        f"Deleted {deleted_count}/{len(delete_targets)} local CSV files."
+        f"Deleted {deleted_count} local CSV/ZIP files."
     )
 
 

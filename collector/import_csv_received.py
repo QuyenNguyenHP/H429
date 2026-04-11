@@ -107,18 +107,29 @@ def parse_row(row: list[str]) -> tuple | None:
     label = str(label).strip()
     dg_name = normalize_dg_name(str(dg_name).strip())
 
-    if dg_name:
-        detected_dg_name, stripped_label = split_dg_name_from_label(label)
-        if detected_dg_name == dg_name:
-            label = stripped_label
-        elif dg_name.upper() == "PMS":
-            if detected_dg_name and detected_dg_name != "PMS":
-                dg_name = detected_dg_name
+    # Keep PMS rows under the PMS group so they don't collide with DG rows on the same addr.
+    if label.startswith("PMS "):
+        if dg_name in {"", "PMS"}:
+            dg_name = "PMS"
+            label = label[len("PMS ") :].strip()
+        else:
+            detected_dg_name, stripped_label = split_dg_name_from_label(label)
+            if detected_dg_name == dg_name:
                 label = stripped_label
-            elif label.startswith("PMS "):
-                label = label[len("PMS ") :].strip()
+    if dg_name:
+        if not label.startswith("PMS "):
+            detected_dg_name, stripped_label = split_dg_name_from_label(label)
+            if detected_dg_name == dg_name:
+                label = stripped_label
+            elif dg_name.upper() == "PMS":
+                if label.startswith("PMS "):
+                    label = label[len("PMS ") :].strip()
     else:
-        dg_name, label = split_dg_name_from_label(label)
+        if label.startswith("PMS "):
+            dg_name = "PMS"
+            label = label[len("PMS ") :].strip()
+        else:
+            dg_name, label = split_dg_name_from_label(label)
 
     if str(serial).strip() == "" or str(addr).strip() == "" or str(label).strip() == "":
         return None
