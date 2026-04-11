@@ -215,3 +215,58 @@ Frontend hiện tự gọi API theo hostname hiện tại với cổng `8000`, n
 
 - Backend: `backend/README.md`
 - Frontend: `frontend/README.md`
+
+## Check_all_status_lable API Summary (Critical)
+
+Backend file: `backend/app/api/Check_all_status_lable.py`
+
+Endpoint:
+- `GET /api/check_all_status_lable/all`
+
+Response shape (per machine):
+- `dg_name`: `DG#1`, `DG#2`, `DG#3`, `ME-PORT`, `ME-STBD`
+- `analog`: list of analog points with `status`
+- `digital`: list of digital points with `status`
+- `pms`: PMS values for DG#1..DG#3 (`current`, `voltage`, `power_kw`, `power_factor`, `frequency`)
+
+### Analog logic
+
+- Threshold profile is defined in `ANALOG_THRESHOLD_PROFILE`.
+- Analog `status` values: `Normal`, `Warning`, `Critical`.
+- Labels with no threshold are always `Normal`.
+- `FUEL OIL PRESSURE ENGINE INLET` and `LUB OIL PRESSURE` are threshold-checked only when machine is running.
+
+Running condition used for threshold checks:
+- DG#1..DG#3: running when digital `ENGINE RUN` is ON/1.
+- ME-PORT, ME-STBD: running when analog `M/E REVOLUTION > 0`.
+
+### Digital logic
+
+Special status labels:
+- `ENGINE RUN`: `Running` / `Stop`
+- `READY TO START`: `Ready` / `Not Ready`
+- `PRIMING PUMP RUN`: `Running` / `Stop`
+- `No.1..No.6 ALARM REPOSE SIGNAL(...)`: `Repose` / `OFF`
+
+Digital alarm rules with repose interlock:
+- For these labels, `Alarm` only when signal value = 1 and related repose signal = 0:
+  - `LUB OIL FILTER DIFFERENTIAL PRESSURE HIGH` -> repose No.6
+  - `FUEL OIL PRESSURE LOW` -> repose No.2
+  - `LUB OIL PRESSURE LOW` -> repose No.2
+  - `H.T. WATER PRESSURE LOW` -> repose No.2
+  - `L.T. WATER PRESSURE LOW` -> repose No.2
+  - `H.T. WATER TEMPERATURE HIGH` -> repose No.1
+  - `T/C LUB OIL PRESSURE LOW` -> repose No.2
+  - `H.T. WATER TEMPERATURE HIGH (STOP)` -> repose No.1
+  - `LUB OIL PRESSURE LOW (STOP)` -> repose No.2
+  - `PRIMING LUB OIL PRESSURE LOW` -> repose No.4
+- Otherwise (general digital points):
+  - value = 1 -> `Alarm`
+  - value = 0 -> `Normal`
+
+### Alarm indication in frontend
+
+Current frontend pages use this API as the source of machine state.
+Machine Alarm light is ON when:
+- any analog point has `status = Critical`, OR
+- any digital point has `status = Alarm`.
