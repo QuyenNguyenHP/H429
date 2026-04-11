@@ -88,8 +88,8 @@
             <!-- Right Panel: Running Hour -->
             <div id="panel-running-hour" class="absolute z-10" style="right: 2.5%; top: 45%; transform: translateY(-50%);">
                 <div class="metric-card">
-                    <div class="metric-label">RUNNING HOUR</div>
-                    <div class="metric-value" id="val-running-hour">-----</div>
+                    <div class="metric-label">RUNNING HOUR (x10h)</div>
+                    <div class="metric-value" id="val-running-hour"*10>-----</div>
                 </div>
             </div>
 
@@ -187,7 +187,7 @@
             fetchWithTimeout,
             resolveApiOrigin
         } = window.DashboardShared;
-        const API_BASE = `${resolveApiOrigin()}/api/dashboard`;
+        const API_BASE = `${resolveApiOrigin()}/api/check_all_status_lable`;
         function normalizeDgParam(param) {
             if (param == null) return "DG#1";
             const raw = String(param).trim().toUpperCase();
@@ -216,6 +216,9 @@
         };
 
         const DIGITAL_FIXED_POINTS = [
+            { addr: 0x11, label: "ENGINE RUN", unit: "On/Off" },
+            { addr: 0x12, label: "READY TO START", unit: "On/Off" },
+            { addr: 0x1B, label: "PRIMING PUMP RUN", unit: "On/Off" },
             { addr: 0x01, label: "LUB OIL FILTER DIFFERENTIAL PRESSURE HIGH", unit: "On/Off" },
             { addr: 0x02, label: "CONTROL AIR PRESSURE LOW", unit: "On/Off" },
             { addr: 0x03, label: "FUEL OIL PRESSURE LOW", unit: "On/Off" },
@@ -232,8 +235,6 @@
             { addr: 0x0E, label: "LUB OIL SUMP TANK LEVEL HIGH", unit: "On/Off" },
             { addr: 0x0F, label: "OIL MIST PRE-ALARM", unit: "On/Off" },
             { addr: 0x10, label: "OIL MIST DETECTOR TROUBLE", unit: "On/Off" },
-            { addr: 0x11, label: "ENGINE RUN", unit: "On/Off" },
-            { addr: 0x12, label: "READY TO START", unit: "On/Off" },
             { addr: 0x13, label: "OVER SPEED (STOP)", unit: "On/Off" },
             { addr: 0x14, label: "H.T. WATER TEMPERATURE HIGH (STOP)", unit: "On/Off" },
             { addr: 0x15, label: "LUB OIL PRESSURE LOW (STOP)", unit: "On/Off" },
@@ -242,7 +243,6 @@
             { addr: 0x18, label: "START FAILURE", unit: "On/Off" },
             { addr: 0x19, label: "PRIMING PUMP TERMAL FAILURE", unit: "On/Off" },
             { addr: 0x1A, label: "PRIMING LUB OIL PRESSURE LOW", unit: "On/Off" },
-            { addr: 0x1B, label: "PRIMING PUMP RUN", unit: "On/Off" },
             { addr: 0x21, label: "SYSTEM FAILURE", unit: "On/Off" },
             { addr: 0x22, label: "CONTROL MODULE FAILURE", unit: "On/Off" },
             { addr: 0x23, label: "SAFTY MODULE FAILURE", unit: "On/Off" },
@@ -250,12 +250,6 @@
             { addr: 0x25, label: "LINK TO REMOTE I/O 1 FAILURE", unit: "On/Off" },
             { addr: 0x26, label: "LINK TO REMOTE I/O 2 FAILURE", unit: "On/Off" },
             { addr: 0x27, label: "LINK TO LCD GAGE BOARD FAILURE", unit: "On/Off" },
-            { addr: 0x29, label: "No.1 ALARM REPOSE SIGNAL(#14)", unit: "On/Off" },
-            { addr: 0x2A, label: "No.2 ALARM REPOSE SIGNAL(#14T)", unit: "On/Off" },
-            { addr: 0x2B, label: "No.3 ALARM REPOSE SIGNAL(EXH. GAS)", unit: "On/Off" },
-            { addr: 0x2C, label: "No.4 ALARM REPOSE SIGNAL(PRIMING)", unit: "On/Off" },
-            { addr: 0x2D, label: "No.5 ALARM REPOSE SIGNAL(STARTING)", unit: "On/Off" },
-            { addr: 0x2E, label: "No.6 ALARM REPOSE SIGNAL(FILTER DIFF. PRESS.)", unit: "On/Off" },
             { addr: 0x31, label: "No.1CYL. EXH. GAS TEMP. DEVIATION ALARM", unit: "On/Off" },
             { addr: 0x32, label: "No.2CYL. EXH. GAS TEMP. DEVIATION ALARM", unit: "On/Off" },
             { addr: 0x33, label: "No.3CYL. EXH. GAS TEMP. DEVIATION ALARM", unit: "On/Off" },
@@ -297,11 +291,21 @@
             { addr: 0x71, label: "LUB OIL TEMP. ENGINE OUTLET SENSOR FAILURE", unit: "On/Off" },
             { addr: 0x72, label: "L.T. WATER TEMP. ENGINE INLET SENSOR FAILURE", unit: "On/Off" },
             { addr: 0x73, label: "L.T. WATER TEMP. ENGINE OUTLET SENSOR FAILURE", unit: "On/Off" },
-            { addr: 0x81, label: "T/C SPEED SENSOR FAILURE", unit: "On/Off" }
+            { addr: 0x81, label: "T/C SPEED SENSOR FAILURE", unit: "On/Off" },
+            { addr: 0x29, label: "No.1 ALARM REPOSE SIGNAL(#14)", unit: "On/Off" },
+            { addr: 0x2A, label: "No.2 ALARM REPOSE SIGNAL(#14T)", unit: "On/Off" },
+            { addr: 0x2B, label: "No.3 ALARM REPOSE SIGNAL(EXH. GAS)", unit: "On/Off" },
+            { addr: 0x2C, label: "No.4 ALARM REPOSE SIGNAL(PRIMING)", unit: "On/Off" },
+            { addr: 0x2D, label: "No.5 ALARM REPOSE SIGNAL(STARTING)", unit: "On/Off" },
+            { addr: 0x2E, label: "No.6 ALARM REPOSE SIGNAL(FILTER DIFF. PRESS.)", unit: "On/Off" }
         ];
 
         const isME = () => TARGET_DG_NAME === "ME-PORT" || TARGET_DG_NAME === "ME-STBD";
-        const filterRowsByTarget = (rows) => filterByTarget(rows, TARGET_DG_NAME);
+        const normLabel = (value) => String(value || "").trim().toUpperCase();
+        const getTargetMachinePayload = (payload) => {
+            if (!Array.isArray(payload)) return null;
+            return payload.find((item) => normalizeDgName(item?.dg_name) === TARGET_DG_NAME) || null;
+        };
 
         const UI_LAYOUT = {
             cylinders: {
@@ -435,10 +439,10 @@
             }
         }
 
-        function updateUI(data) {
-            if (!data || data.length === 0) return;
+        function updateUI(analogRows) {
+            if (!analogRows || analogRows.length === 0) return;
 
-            filterRowsByTarget(data).forEach(item => {
+            analogRows.forEach(item => {
                 if (item.value == null || item.label == null) return;
                 // Xá»­ lÃ½ cÃ¡c giÃ¡ trá»‹ Cylinder (No.1 - No.6)
                 if (item.label.includes("No.")) {
@@ -459,6 +463,12 @@
                     if (elementId) {
                         const el = getById(elementId);
                         if (el) {
+                            if (item.label === "RUNNING HOUR") {
+                                const next = String(Math.round((Number(item.value) || 0) * 10));
+                                setText(el, next);
+                                applyStatusStyle(el, item.status);
+                                return;
+                            }
                             const isPressure = item.label.includes("PRESSURE") || item.label.includes("INLET (MPa)");
                             const next = isPressure ? item.value.toFixed(2) : String(Math.round(item.value));
                             setText(el, next);
@@ -473,10 +483,9 @@
         }
 
         function updateHeaderLights(digitalRows) {
-            const rows = filterRowsByTarget(digitalRows);
-
-            const readyRow = rows.find(item => String(item.label || "").trim().toUpperCase() === "READY TO START");
-            const runRow = rows.find(item => String(item.label || "").trim().toUpperCase() === "ENGINE RUN");
+            const rows = Array.isArray(digitalRows) ? digitalRows : [];
+            const readyRow = rows.find(item => normLabel(item.label) === "READY TO START");
+            const runRow = rows.find(item => normLabel(item.label) === "ENGINE RUN");
             const isEngineRunning = isOnValue(runRow?.value);
 
             const readyLight = getById("light-ready");
@@ -490,57 +499,57 @@
             }
         }
 
-        function updateAlarmLight(alarmRows) {
+        function updateAlarmLight(machineData) {
             const alarmLight = getById("light-alarm");
             if (!alarmLight) return;
-            const rows = Array.isArray(alarmRows) ? alarmRows : [];
-            const dgAlarm = rows.find(item => normalizeDgName(item.dg_name) === TARGET_DG_NAME);
-            alarmLight.classList.toggle("active", String(dgAlarm?.alarm || "").trim().toUpperCase() === "ON");
+            const analogRows = Array.isArray(machineData?.analog) ? machineData.analog : [];
+            const digitalRows = Array.isArray(machineData?.digital) ? machineData.digital : [];
+            const analogCritical = analogRows.some((item) => String(item?.status || "").trim().toLowerCase() === "critical");
+            const digitalAlarm = digitalRows.some((item) => String(item?.status || "").trim().toLowerCase() === "alarm");
+            alarmLight.classList.toggle("active", analogCritical || digitalAlarm);
         }
 
-        function updateDigitalTable(data) {
+        function updateDigitalTable(digitalRows) {
             const leftTbody = getById("digital-value-tbody-left");
             const rightTbody = getById("digital-value-tbody-right");
             if (!leftTbody || !rightTbody) return;
             leftTbody.innerHTML = "";
             rightTbody.innerHTML = "";
-            const rows = filterRowsByTarget(data);
-            const valueByLabel = new Map();
+            const rows = Array.isArray(digitalRows) ? digitalRows : [];
+            const rowByLabel = new Map();
             rows.forEach(item => {
-                const key = String(item.label || "").trim();
+                const key = normLabel(item.label);
                 if (!key) return;
-                valueByLabel.set(key, item.value);
+                rowByLabel.set(key, item);
             });
 
             const half = Math.ceil(DIGITAL_FIXED_POINTS.length / 2);
             const leftPoints = DIGITAL_FIXED_POINTS.slice(0, half);
             const rightPoints = DIGITAL_FIXED_POINTS.slice(half);
-            const greenStatusLabels = new Set(["ENGINE RUN", "READY TO START"]);
 
             function renderPoints(points, tbody) {
                 points.forEach(point => {
                     const tr = document.createElement("tr");
-                    const hasValue = valueByLabel.has(point.label);
-                    const rawValue = hasValue ? valueByLabel.get(point.label) : "";
-                    let value = rawValue == null ? "" : String(rawValue);
-                    if (hasValue) {
-                        if (isOnValue(rawValue)) {
-                            value = "ON";
-                        } else if (String(rawValue).trim() === "0" || Number(rawValue) === 0) {
-                            value = "OFF";
-                        }
-                    }
+                    const item = rowByLabel.get(normLabel(point.label));
+                    const displayStatus = String(item?.status || "").trim();
 
                     const labelTd = document.createElement("td");
                     labelTd.textContent = point.label;
                     tr.appendChild(labelTd);
 
                     const valueTd = document.createElement("td");
-                    valueTd.textContent = value;
-                    if (hasValue && isOnValue(rawValue)) {
-                        valueTd.classList.add(
-                            greenStatusLabels.has(point.label) ? "digital-status-on" : "digital-on"
-                        );
+                    valueTd.textContent = displayStatus;
+                    const displayUpper = displayStatus.toUpperCase();
+                    if (displayUpper === "ALARM") {
+                        valueTd.classList.add("digital-on");
+                    } else if (displayUpper === "RUNNING") {
+                        valueTd.classList.add("digital-status-on");
+                    } else if (displayUpper === "READY") {
+                        valueTd.classList.add("digital-status-on");
+                    } else if (displayUpper === "REPOSE") {
+                        valueTd.classList.add("digital-status-repose");
+                    } else if (displayUpper === "OFF" || displayUpper === "NOT READY" || displayUpper === "STOP") {
+                        valueTd.classList.add("status-warning");
                     }
                     tr.appendChild(valueTd);
 
@@ -561,28 +570,18 @@
             if (isFetching) return;
             isFetching = true;
             try {
-                const analogPath = isME()
-                    ? `${API_BASE}/analog_lable_value_ME`
-                    : `${API_BASE}/analog_lable_value`;
-                const [analogResponse, digitalResponse, alarmResponse] = await Promise.all([
-                    fetchWithTimeout(analogPath, FETCH_TIMEOUT_MS, { cache: "no-store" }),
-                    fetchWithTimeout(`${API_BASE}/live_digital_value`, FETCH_TIMEOUT_MS, { cache: "no-store" }),
-                    fetchWithTimeout(`${API_BASE}/dg_status`, FETCH_TIMEOUT_MS, { cache: "no-store" })
-                ]);
-                if (!analogResponse.ok) throw new Error(`Analog API error: ${analogResponse.status}`);
-                if (!digitalResponse.ok) throw new Error(`Digital API error: ${digitalResponse.status}`);
-                if (!alarmResponse.ok) throw new Error(`Alarm API error: ${alarmResponse.status}`);
+                const response = await fetchWithTimeout(`${API_BASE}/all`, FETCH_TIMEOUT_MS, { cache: "no-store" });
+                if (!response.ok) throw new Error(`Status API error: ${response.status}`);
 
-                const [analogData, digitalData, alarmData] = await Promise.all([
-                    analogResponse.json(),
-                    digitalResponse.json(),
-                    alarmResponse.json()
-                ]);
+                const payload = await response.json();
+                const machineData = getTargetMachinePayload(payload);
+                const analogRows = Array.isArray(machineData?.analog) ? machineData.analog : [];
+                const digitalRows = Array.isArray(machineData?.digital) ? machineData.digital : [];
 
-                updateUI(analogData);
-                updateDigitalTable(digitalData);
-                updateHeaderLights(digitalData);
-                updateAlarmLight(alarmData);
+                updateUI(analogRows);
+                updateDigitalTable(digitalRows);
+                updateHeaderLights(digitalRows);
+                updateAlarmLight(machineData);
                 consecutiveFailures = 0;
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -592,7 +591,7 @@
                     if (statusMsg) statusMsg.style.opacity = '1';
                 }
                 updateHeaderLights([]);
-                updateAlarmLight([]);
+                updateAlarmLight(null);
             } finally {
                 isFetching = false;
             }

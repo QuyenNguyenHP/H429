@@ -56,6 +56,11 @@ body {
     box-shadow: 0 0 var(--status-light-glow-blur) var(--light-green-glow);
 }
 
+.light-ready.standby-active {
+    background: radial-gradient(circle at 30% 30%, #facc15, #a16207);
+    box-shadow: 0 0 var(--status-light-glow-blur) #f59e0b;
+}
+
 .light-alarm.active {
     background: radial-gradient(circle at 30% 30%, var(--light-red-start), var(--light-red-end));
     box-shadow: 0 0 var(--status-light-glow-blur) var(--light-red-glow);
@@ -191,6 +196,12 @@ body {
 
 .digital-table .digital-status-on {
     background-color: #16a34a;
+    color: #fff;
+    font-weight: 700;
+}
+
+.digital-table .digital-status-repose {
+    background-color: #2563eb;
     color: #fff;
     font-weight: 700;
 }

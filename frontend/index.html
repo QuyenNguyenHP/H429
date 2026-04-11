@@ -46,7 +46,7 @@
                     <div class="dg-status-column">
                         <div class="dg-status-item">
                             <div id="dg1-ready-light" class="status-light light-ready"></div>
-                            <span class="dg-status-label font-extrabold">READY</span>
+                            <span class="dg-status-label font-extrabold">STAND BY</span>
                         </div>
                         <div class="dg-status-item">
                             <div id="dg1-run-light" class="status-light light-run"></div>
@@ -71,7 +71,7 @@
                     <div class="dg-status-column">
                         <div class="dg-status-item">
                             <div id="dg2-ready-light" class="status-light light-ready"></div>
-                            <span class="dg-status-label font-extrabold">READY</span>
+                            <span class="dg-status-label font-extrabold">STAND BY</span>
                         </div>
                         <div class="dg-status-item">
                             <div id="dg2-run-light" class="status-light light-run"></div>
@@ -96,7 +96,7 @@
                     <div class="dg-status-column">
                         <div class="dg-status-item">
                             <div id="dg3-ready-light" class="status-light light-ready"></div>
-                            <span class="dg-status-label font-extrabold">READY</span>
+                            <span class="dg-status-label font-extrabold">STAND BY</span>
                         </div>
                         <div class="dg-status-item">
                             <div id="dg3-run-light" class="status-light light-run"></div>
@@ -254,7 +254,7 @@
 
     <script>
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
-        const INDEX_API_BASE = "/api/index";
+        const STATUS_API = "/api/check_all_status_lable/all";
         const INDEX_DG_CONFIG = [
             { cardNo: 1, dgName: "DG#1", hasPms: true },
             { cardNo: 2, dgName: "DG#2", hasPms: true },
@@ -361,10 +361,24 @@
             });
         }
 
-        function isOnValue(value) {
-            if (typeof value === "number") return value === 1;
-            const normalized = String(value ?? "").trim().toLowerCase();
-            return normalized === "on" || normalized === "1" || normalized === "true";
+        function setDGState(dgNo, isRunning, isReady, hasAlarm, hasData) {
+            const readyLight = document.getElementById(`dg${dgNo}-ready-light`);
+            const runLight = document.getElementById(`dg${dgNo}-run-light`);
+            const alarmLight = document.getElementById(`dg${dgNo}-alarm-light`);
+            const linkFail = document.getElementById(`dg${dgNo}-link-fail`);
+
+            if (readyLight) {
+                const standbyActive = (dgNo === 1 || dgNo === 2 || dgNo === 3) && hasData && !isRunning;
+                readyLight.classList.toggle("active", !!isReady);
+                readyLight.classList.toggle("standby-active", standbyActive);
+            }
+            if (runLight) runLight.classList.toggle("active", !!isRunning);
+            if (alarmLight) alarmLight.classList.toggle("active", !!hasAlarm);
+            if (linkFail) {
+                linkFail.dataset.hideWhenOk = "1";
+                linkFail.textContent = hasData ? "" : "FAIL CONNECTION !";
+                linkFail.style.visibility = hasData ? "hidden" : "visible";
+            }
         }
 
         function formatPmsValue(point, opts = {}) {
@@ -377,46 +391,34 @@
             return unit ? `${fixed} ${unit}` : `${fixed}`;
         }
 
-        function setDGState(dgNo, isRunning, isReady, hasAlarm, hasData) {
-            const readyLight = document.getElementById(`dg${dgNo}-ready-light`);
-            const runLight = document.getElementById(`dg${dgNo}-run-light`);
-            const alarmLight = document.getElementById(`dg${dgNo}-alarm-light`);
-            const linkFail = document.getElementById(`dg${dgNo}-link-fail`);
-
-            if (readyLight) readyLight.classList.toggle("active", !!isReady);
-            if (runLight) runLight.classList.toggle("active", !!isRunning);
-            if (alarmLight) alarmLight.classList.toggle("active", !!hasAlarm);
-            if (linkFail) {
-                linkFail.dataset.hideWhenOk = "1";
-                linkFail.textContent = hasData ? "" : "FAIL CONNECTION !";
-                linkFail.style.visibility = hasData ? "hidden" : "visible";
-            }
-        }
-
         async function loadIndexStatus() {
             try {
-                const results = await Promise.all(
-                    INDEX_DG_CONFIG.map(async (cfg) => {
-                        const url = `${API_BASE}${INDEX_API_BASE}/${encodeURIComponent(cfg.dgName)}`;
-                        const res = await fetch(url, { cache: "no-store" });
-                        if (!res.ok) throw new Error(`API error ${cfg.dgName}: ${res.status}`);
-                        const data = await res.json();
-                        return { cfg, data };
-                    })
-                );
+                const res = await fetch(`${API_BASE}${STATUS_API}`, { cache: "no-store" });
+                if (!res.ok) throw new Error(`Status API error: ${res.status}`);
+                const payload = await res.json();
+                const rows = Array.isArray(payload) ? payload : [];
 
-                results.forEach(({ cfg, data }) => {
-                    const status = data?.status || {};
-                    setDGState(
-                        cfg.cardNo,
-                        !!status.running,
-                        !!status.ready,
-                        !!status.alarm,
-                        status.has_data !== false
-                    );
+                INDEX_DG_CONFIG.forEach((cfg) => {
+                    const machine = rows.find((item) => String(item?.dg_name || "").trim().toUpperCase() === cfg.dgName.toUpperCase());
+                    const digital = Array.isArray(machine?.digital) ? machine.digital : [];
+                    const analog = Array.isArray(machine?.analog) ? machine.analog : [];
+
+                    const runRow = digital.find((item) => String(item?.label || "").trim().toUpperCase() === "ENGINE RUN");
+                    const readyRow = digital.find((item) => String(item?.label || "").trim().toUpperCase() === "READY TO START");
+                    const meRevRow = analog.find((item) => String(item?.label || "").trim().toUpperCase() === "M/E REVOLUTION");
+                    const meRevValue = Number(meRevRow?.value);
+                    const isRunning = cfg.dgName.startsWith("ME-")
+                        ? (!Number.isNaN(meRevValue) && meRevValue > 0)
+                        : String(runRow?.status || "").trim().toUpperCase() === "RUNNING";
+                    const isReady = String(readyRow?.status || "").trim().toUpperCase() === "READY";
+                    const hasAlarmDigital = digital.some((item) => String(item?.status || "").trim().toUpperCase() === "ALARM");
+                    const hasAlarmAnalog = analog.some((item) => String(item?.status || "").trim().toUpperCase() === "CRITICAL");
+                    const hasData = digital.length > 0 || analog.length > 0;
+
+                    setDGState(cfg.cardNo, isRunning, isReady, hasAlarmDigital || hasAlarmAnalog, hasData);
 
                     if (!cfg.hasPms) return;
-                    const pms = data?.pms || {};
+                    const pms = machine?.pms || {};
                     const dgNo = cfg.cardNo;
                     const pfEl = document.getElementById(`pms-card-dg${dgNo}-pf`);
                     const freqEl = document.getElementById(`pms-card-dg${dgNo}-freq`);
