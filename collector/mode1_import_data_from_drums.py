@@ -15,6 +15,7 @@ RECEIVED_DIR = BASE_DIR / "csv_received"
 ARCHIVED_DIR = BASE_DIR / "csv_archived"
 DB_PATH = BASE_DIR / "live_engine_data.db"
 DEFAULT_INTERVAL = int(os.getenv("CSV_IMPORT_INTERVAL", "5"))
+CONNECTION_FLAG_PATH = BASE_DIR.parent / "backend" / ".data_connection_enabled"
 DG_ORDER = {"DG#1": 1, "DG#2": 2, "DG#3": 3, "ME-PORT": 4, "ME-STBD": 5}
 DG_PREFIXES = ("DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD", "ME_PORT", "ME_STBD", "PMS")
 DG_PREFIXES_NO_PMS = ("DG#1", "DG#2", "DG#3", "ME-PORT", "ME-STBD", "ME_PORT", "ME_STBD")
@@ -248,6 +249,9 @@ def cleanup_extracted_tmp_dir() -> None:
 
 
 def run_once() -> None:
+    if not is_data_connection_enabled():
+        return
+
     RECEIVED_DIR.mkdir(parents=True, exist_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -339,6 +343,16 @@ def main() -> None:
             pass
 
     run_watch(args.interval, stop_event)
+
+
+def is_data_connection_enabled() -> bool:
+    if not CONNECTION_FLAG_PATH.exists():
+        return False
+    try:
+        raw = CONNECTION_FLAG_PATH.read_text(encoding="utf-8").strip().lower()
+        return raw in {"1", "true", "yes", "on", "connected"}
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

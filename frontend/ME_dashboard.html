@@ -195,7 +195,7 @@
             fetchWithTimeout,
             resolveApiOrigin
         } = window.DashboardShared;
-        const API_BASE = `${resolveApiOrigin()}/api/dashboard`;
+        const API_BASE = `${resolveApiOrigin()}/api/check_all_status_lable`;
         const ANALOG_FIXED_POINTS = [
             "BOOST AIR PRESS.",
             "FUEL OIL PRESS.",
@@ -336,7 +336,11 @@
 
         const TARGET_ME = ME_OPTIONS.includes(normalizeDgName(dgParam)) ? normalizeDgName(dgParam) : "ME-PORT";
 
-        const filterRowsByTarget = (rows) => filterByTarget(rows, TARGET_ME);
+        const filterRowsByTarget = (rows) => {
+            if (!Array.isArray(rows)) return [];
+            const hasDgName = rows.some((item) => item && item.dg_name != null);
+            return hasDgName ? filterByTarget(rows, TARGET_ME) : rows;
+        };
 
         function applyUILayout() {
             applyLayoutToElement(getById("panel-me-rev"), {
@@ -450,12 +454,14 @@
             }
         }
 
-        function updateAlarmLight(alarmRows) {
+        function updateAlarmLight(machineData) {
             const alarmLight = getById("light-alarm");
             if (!alarmLight) return;
-            const rows = Array.isArray(alarmRows) ? alarmRows : [];
-            const dgAlarm = rows.find(item => normalizeDgName(item.dg_name) === TARGET_ME);
-            alarmLight.classList.toggle("active", String(dgAlarm?.alarm || "").trim().toUpperCase() === "ON");
+            const analogRows = Array.isArray(machineData?.analog) ? machineData.analog : [];
+            const digitalRows = Array.isArray(machineData?.digital) ? machineData.digital : [];
+            const analogCritical = analogRows.some((item) => String(item?.status || "").trim().toLowerCase() === "critical");
+            const digitalAlarm = digitalRows.some((item) => String(item?.status || "").trim().toLowerCase() === "alarm");
+            alarmLight.classList.toggle("active", analogCritical || digitalAlarm);
         }
 
         function updateOverlayAnalog(data) {
@@ -587,19 +593,49 @@
             const el = getById('current-datetime');
             if (!el) return;
             const next = String(timestampValue || '').trim();
-            el.textContent = next || '--/--/--  --:--:--';
+            el.textContent = next || '---- -- -- --:--:--';
         }
 
-        function extractTimestamp(data) {
-            if (!Array.isArray(data)) return '';
-            const rows = filterRowsByTarget(data);
-            for (const item of rows) {
+        function normalizeTimestampText(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            const compact = raw.replace('T', ' ').replace('Z', '').trim();
+            const m = compact.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/);
+            if (m) return `${m[1]} ${m[2]}`;
+            return compact;
+        }
+
+        function formatTimestampDisplay(timestampPayload, fallbackValue) {
+            const datePart = String(timestampPayload?.date || '').trim();
+            const timePart = String(timestampPayload?.time || '').trim();
+            if (datePart && timePart) return normalizeTimestampText(`${datePart} ${timePart}`);
+            const timestampPart = String(timestampPayload?.timestamp || '').trim();
+            if (timestampPart) return normalizeTimestampText(timestampPart);
+            return normalizeTimestampText(fallbackValue);
+        }
+
+        function extractTimestamp(machineData, payload) {
+            const directValue =
+                machineData?.TimeStamp ??
+                machineData?.timestamp ??
+                machineData?.timeStamp ??
+                machineData?.time_stamp ??
+                payload?.TimeStamp ??
+                payload?.timestamp ??
+                payload?.timeStamp ??
+                payload?.time_stamp;
+            if (directValue != null && String(directValue).trim() !== '') return directValue;
+
+            const analogRows = Array.isArray(machineData?.analog) ? machineData.analog : [];
+            const tsRow = analogRows.find((item) => {
                 const label = String(item?.label || '').trim().toUpperCase();
-                if (label === 'TIMESTAMP' || label === 'TIME STAMP' || label === 'DATE & TIME') {
-                    const value = item?.value;
-                    if (value != null && String(value).trim() !== '') return value;
-                }
-            }
+                return label === 'TIMESTAMP' || label === 'TIME STAMP' || label === 'DATE & TIME';
+            });
+            if (tsRow?.value != null && String(tsRow.value).trim() !== '') return tsRow.value;
+
+            const digitalRows = Array.isArray(machineData?.digital) ? machineData.digital : [];
+            const point = analogRows.find((item) => item?.timestamp) || digitalRows.find((item) => item?.timestamp);
+            if (point?.timestamp != null && String(point.timestamp).trim() !== '') return point.timestamp;
             return '';
         }
 
@@ -619,27 +655,22 @@
             if (isFetching) return;
             isFetching = true;
             try {
-                const [analogResponse, digitalResponse, alarmResponse] = await Promise.all([
-                    fetchWithTimeout(`${API_BASE}/analog_lable_value_ME`, FETCH_TIMEOUT_MS, { cache: "no-store" }),
-                    fetchWithTimeout(`${API_BASE}/live_digital_value`, FETCH_TIMEOUT_MS, { cache: "no-store" }),
-                    fetchWithTimeout(`${API_BASE}/dg_status`, FETCH_TIMEOUT_MS, { cache: "no-store" })
-                ]);
-                if (!analogResponse.ok) throw new Error(`Analog API error: ${analogResponse.status}`);
-                if (!digitalResponse.ok) throw new Error(`Digital API error: ${digitalResponse.status}`);
-                if (!alarmResponse.ok) throw new Error(`Alarm API error: ${alarmResponse.status}`);
+                const response = await fetchWithTimeout(`${API_BASE}/all`, FETCH_TIMEOUT_MS, { cache: "no-store" });
+                if (!response.ok) throw new Error(`Status API error: ${response.status}`);
 
-                const [analogData, digitalData, alarmData] = await Promise.all([
-                    analogResponse.json(),
-                    digitalResponse.json(),
-                    alarmResponse.json()
-                ]);
+                const payload = await response.json();
+                const machineData = Array.isArray(payload)
+                    ? payload.find((item) => normalizeDgName(item?.dg_name) === TARGET_ME)
+                    : null;
+                const analogData = Array.isArray(machineData?.analog) ? machineData.analog : [];
+                const digitalData = Array.isArray(machineData?.digital) ? machineData.digital : [];
 
                 updateOverlayAnalog(analogData);
                 updateAnalogTable(analogData);
                 updateDigitalTable(digitalData);
                 updateHeaderLights(digitalData);
-                updateAlarmLight(alarmData);
-                updateTimestampHeader(extractTimestamp(analogData));
+                updateAlarmLight(machineData);
+                updateTimestampHeader(formatTimestampDisplay(null, extractTimestamp(machineData, payload)));
                 consecutiveFailures = 0;
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -647,7 +678,7 @@
                 latestMeRevolution = 0;
                 if (consecutiveFailures >= 2) {
                     updateHeaderLights([]);
-                    updateAlarmLight([]);
+                    updateAlarmLight(null);
                 }
             } finally {
                 isFetching = false;

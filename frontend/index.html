@@ -19,6 +19,11 @@
                 <div class="text-base font-bold text-center tracking-tight" id="clock">--/--/-- &nbsp;&nbsp; --:--:--</div>
             </div>
 
+            <!-- Vessel Tag -->
+            <div id="vessel-box" class="header-box px-5 py-2 text-center">
+                <span class="dg-title vessel-title !mb-0 !pb-0 !border-b-0">VESSEL : H429</span>
+            </div>
+
             <!-- DRUMS Logo Center -->
             <div id="logo-box" class="header-clickable absolute left-1/2 -translate-x-1/2 h-[66px] flex items-center justify-center">
                 <img src="./Asset/DRUMS_LOGO.png" alt="DRUMS logo" class="h-[70px] w-auto object-contain">
@@ -30,6 +35,18 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 </button>
                 <button title="System Info" class="header-clickable w-10 h-10 bg-white border-2 border-blue-800 rounded-full flex items-center justify-center text-blue-800 font-black hover:bg-blue-50 transition-colors shadow-sm">i</button>
+            </div>
+
+            <div id="data-connection-box" class="header-box min-w-[270px]">
+                <div class="text-[10px] font-extrabold border-b border-gray-100 mb-2 text-center text-gray-600">DATA CONNECTION</div>
+                <div class="flex items-center gap-2">
+                    <select id="data-conn-mode" class="border border-slate-400 bg-white px-2 py-1 text-xs font-bold w-[120px]">
+                        <option value="mode1">Mode 1</option>
+                        <option value="mode2">Mode 2</option>
+                    </select>
+                    <button id="data-conn-btn" class="header-clickable bg-blue-700 text-white px-3 py-1 text-xs font-extrabold border border-blue-900 hover:bg-blue-800">Connect</button>
+                    <span id="data-conn-state" class="text-[11px] font-bold text-slate-600">No Connection</span>
+                </div>
             </div>
         </div>
 
@@ -253,8 +270,14 @@
     </div>
 
     <script>
-        const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
+        const API_BASE = (() => {
+            const hostname = window.location.hostname || "localhost";
+            if (window.location.protocol === "file:") return `http://${hostname}:8000`;
+            const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+            return `${protocol}//${hostname}:8000`;
+        })();
         const STATUS_API = "/api/check_all_status_lable/all";
+        let isDataConnected = false;
         const INDEX_DG_CONFIG = [
             { cardNo: 1, dgName: "DG#1", hasPms: true },
             { cardNo: 2, dgName: "DG#2", hasPms: true },
@@ -266,8 +289,10 @@
         // Cập nhật đồng hồ thời gian thực
         const UI_LAYOUT = {
             dateTimeBox: { mode: "absolute", x: "0%", y: "0%" },
+            vesselBox: { mode: "absolute", x: "50%", y: "70px", width: "400px", transform: "translateX(-50%)" },
             logoBox: { mode: "absolute", x: "50%", y: "0%", transform: "translateX(-50%)" },
             headerIcons: { mode: "absolute", x: "100%", y: "0%", transform: "translateX(-100%)" },
+            dataConnectionBox: { mode: "absolute", x: "100%", y: "50px", transform: "translateX(-100%)" },
             systemStatusBar: { mode: "absolute", x: "1.5%", y: "96%", width: "97%" },
             cards: {
                 "1": { x: "1.5%", y: "3%", width: "31%", height: "330px" },
@@ -302,8 +327,10 @@
 
         function applyUILayout(layout = UI_LAYOUT) {
             applyLayoutForElement(document.getElementById("date-time-box"), layout.dateTimeBox);
+            applyLayoutForElement(document.getElementById("vessel-box"), layout.vesselBox);
             applyLayoutForElement(document.getElementById("logo-box"), layout.logoBox);
             applyLayoutForElement(document.getElementById("header-icons"), layout.headerIcons);
+            applyLayoutForElement(document.getElementById("data-connection-box"), layout.dataConnectionBox);
             applyLayoutForElement(document.getElementById("system-status-bar"), layout.systemStatusBar);
             applyCardLayout(layout.cards);
             applyPmsCardLayout(layout.pmsCards);
@@ -391,7 +418,93 @@
             return unit ? `${fixed} ${unit}` : `${fixed}`;
         }
 
+        function setDataConnectionUI(connected) {
+            const btn = document.getElementById("data-conn-btn");
+            const state = document.getElementById("data-conn-state");
+            if (!btn || !state) return;
+            isDataConnected = !!connected;
+            btn.dataset.connected = connected ? "1" : "0";
+            btn.textContent = connected ? "Disconnect" : "Connect";
+            btn.classList.toggle("bg-red-700", connected);
+            btn.classList.toggle("border-red-900", connected);
+            btn.classList.toggle("hover:bg-red-800", connected);
+            btn.classList.toggle("bg-green-700", !connected);
+            btn.classList.toggle("border-green-900", !connected);
+            btn.classList.toggle("hover:bg-green-800", !connected);
+            state.textContent = connected ? "Connected" : "No Connection";
+            state.classList.toggle("text-green-700", connected);
+            state.classList.toggle("text-slate-600", !connected);
+        }
+
+        function setDataConnectionError(message) {
+            const state = document.getElementById("data-conn-state");
+            if (!state) return;
+            state.textContent = message || "Error";
+            state.classList.remove("text-green-700", "text-slate-600");
+            state.classList.add("text-red-700");
+        }
+
+        async function loadDataConnectionStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/system/data_connection/status`, { cache: "no-store" });
+                if (!res.ok) throw new Error(`Data connection status error: ${res.status}`);
+                const payload = await res.json();
+                const modeSelect = document.getElementById("data-conn-mode");
+                if (modeSelect && payload?.mode) modeSelect.value = String(payload.mode);
+                setDataConnectionUI(!!payload?.connected);
+                if (payload?.collector_script) console.log("Collector script:", payload.collector_script);
+            } catch (error) {
+                console.error("Data connection status fetch error:", error);
+                setDataConnectionError("Status Error");
+            }
+        }
+
+        function bindDataConnectionControls() {
+            const btn = document.getElementById("data-conn-btn");
+            const modeSelect = document.getElementById("data-conn-mode");
+            if (!btn || !modeSelect) return;
+            btn.addEventListener("click", async () => {
+                btn.disabled = true;
+                try {
+                    const isConnected = btn.dataset.connected === "1";
+                    let res;
+                    if (isConnected) {
+                        res = await fetch(`${API_BASE}/api/system/data_connection/disconnect`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" }
+                        });
+                    } else {
+                        const mode = String(modeSelect.value || "mode1");
+                        res = await fetch(`${API_BASE}/api/system/data_connection/connect`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ mode }),
+                        });
+                    }
+                    if (!res.ok) {
+                        let detail = "";
+                        try {
+                            const errPayload = await res.json();
+                            detail = String(errPayload?.detail || "");
+                        } catch (_) {
+                            detail = "";
+                        }
+                        throw new Error(`Data connection connect error: ${res.status}${detail ? ` - ${detail}` : ""}`);
+                    }
+                    const payload = await res.json();
+                    setDataConnectionUI(!!payload?.connected);
+                    if (payload?.collector_script) console.log("Collector script:", payload.collector_script);
+                } catch (error) {
+                    console.error("Data connection connect error:", error);
+                    setDataConnectionError("Connect Failed");
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        }
+
         async function loadIndexStatus() {
+            if (!isDataConnected) return;
             try {
                 const res = await fetch(`${API_BASE}${STATUS_API}`, { cache: "no-store" });
                 if (!res.ok) throw new Error(`Status API error: ${res.status}`);
@@ -456,6 +569,8 @@
         // Khởi tạo các sự kiện
         window.onload = () => {
             applyUILayout();
+            bindDataConnectionControls();
+            loadDataConnectionStatus();
             updateClock();
             loadIndexStatus();
             setInterval(updateClock, 1000); // Cập nhật mỗi giây

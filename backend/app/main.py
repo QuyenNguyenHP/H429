@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import Check_all_status_lable, api_dashboard, api_index, system, trends
+from app.api import Check_all_status_lable, api_dashboard, api_index, system, timestamp, trends
 from app.config import APP_NAME, APP_VERSION, CORS_ORIGINS
 from app.db import engine
 from app.models import Base
@@ -30,6 +30,7 @@ app.include_router(trends.router)
 app.include_router(Check_all_status_lable.router)
 app.include_router(system.router)
 app.include_router(api_index.router)
+app.include_router(timestamp.router)
 
 
 @app.get("/")

@@ -188,6 +188,7 @@
             resolveApiOrigin
         } = window.DashboardShared;
         const API_BASE = `${resolveApiOrigin()}/api/check_all_status_lable`;
+        const TIMESTAMP_API_BASE = `${resolveApiOrigin()}/api/timestamp`;
         function normalizeDgParam(param) {
             if (param == null) return "DG#1";
             const raw = String(param).trim().toUpperCase();
@@ -570,10 +571,17 @@
             if (isFetching) return;
             isFetching = true;
             try {
-                const response = await fetchWithTimeout(`${API_BASE}/all`, FETCH_TIMEOUT_MS, { cache: "no-store" });
+                const [response, timestampResponse] = await Promise.all([
+                    fetchWithTimeout(`${API_BASE}/all`, FETCH_TIMEOUT_MS, { cache: "no-store" }),
+                    fetchWithTimeout(`${TIMESTAMP_API_BASE}?dg_name=${encodeURIComponent(TARGET_DG_NAME)}`, FETCH_TIMEOUT_MS, { cache: "no-store" })
+                ]);
                 if (!response.ok) throw new Error(`Status API error: ${response.status}`);
+                if (!timestampResponse.ok) throw new Error(`Timestamp API error: ${timestampResponse.status}`);
 
-                const payload = await response.json();
+                const [payload, timestampData] = await Promise.all([
+                    response.json(),
+                    timestampResponse.json()
+                ]);
                 const machineData = getTargetMachinePayload(payload);
                 const analogRows = Array.isArray(machineData?.analog) ? machineData.analog : [];
                 const digitalRows = Array.isArray(machineData?.digital) ? machineData.digital : [];
@@ -582,7 +590,7 @@
                 updateDigitalTable(digitalRows);
                 updateHeaderLights(digitalRows);
                 updateAlarmLight(machineData);
-                updateTimestampHeader(extractTimestamp(machineData, payload));
+                updateTimestampHeader(formatTimestampDisplay(timestampData, extractTimestamp(machineData, payload)));
                 consecutiveFailures = 0;
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -602,7 +610,16 @@
             const el = getById('current-datetime');
             if (!el) return;
             const next = String(timestampValue || '').trim();
-            el.textContent = next || '--/--/--  --:--:--';
+            el.textContent = next || '--:--:--';
+        }
+
+        function formatTimestampDisplay(timestampPayload, fallbackValue) {
+            const datePart = String(timestampPayload?.date || '').trim();
+            const timePart = String(timestampPayload?.time || '').trim();
+            if (datePart && timePart) return `${datePart} ${timePart}`;
+            const timestampPart = String(timestampPayload?.timestamp || '').trim();
+            if (timestampPart) return timestampPart;
+            return String(fallbackValue || '').trim();
         }
 
         function extractTimestamp(machineData, payload) {

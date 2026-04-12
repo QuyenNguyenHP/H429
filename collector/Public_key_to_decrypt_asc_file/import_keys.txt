@@ -1,0 +1,5 @@
+1. Import public key:
+gpg --import romel-public.key
+
+2. Import private key under root:
+sudo gpg --import romel-private.key

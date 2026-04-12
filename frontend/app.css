@@ -403,6 +403,11 @@ body {
     padding-bottom: 6px;
 }
 
+.vessel-title {
+    color: #b91c1c;
+    border-color: #b91c1c;
+}
+
 .dg-status-column {
     width: 170px;
     display: flex;
