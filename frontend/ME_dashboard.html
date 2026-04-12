@@ -45,7 +45,7 @@
                 </div>
             </div>
             <div class="bg-white border border-gray-400 p-2 text-right shadow-sm">
-                <div class="text-[10px] font-bold border-b border-gray-200 mb-1">DATE & TIME</div>
+                <div class="text-[10px] font-bold border-b border-gray-200 mb-1">DATA DATE & TIME</div>
                 <div class="text-lg font-bold" id="current-datetime">--/--/-- &nbsp;&nbsp; --:--:--</div>
             </div>
         </div>
@@ -583,12 +583,24 @@
             render(rightPoints, rightTbody);
         }
 
-        function updateDateTime() {
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-GB');
-            const timeStr = now.toLocaleTimeString('en-GB', { hour12: false });
+        function updateTimestampHeader(timestampValue) {
             const el = getById('current-datetime');
-            if (el) el.innerHTML = `${dateStr} &nbsp;&nbsp; ${timeStr}`;
+            if (!el) return;
+            const next = String(timestampValue || '').trim();
+            el.textContent = next || '--/--/--  --:--:--';
+        }
+
+        function extractTimestamp(data) {
+            if (!Array.isArray(data)) return '';
+            const rows = filterRowsByTarget(data);
+            for (const item of rows) {
+                const label = String(item?.label || '').trim().toUpperCase();
+                if (label === 'TIMESTAMP' || label === 'TIME STAMP' || label === 'DATE & TIME') {
+                    const value = item?.value;
+                    if (value != null && String(value).trim() !== '') return value;
+                }
+            }
+            return '';
         }
 
         function bindHomeNavigation() {
@@ -627,6 +639,7 @@
                 updateDigitalTable(digitalData);
                 updateHeaderLights(digitalData);
                 updateAlarmLight(alarmData);
+                updateTimestampHeader(extractTimestamp(analogData));
                 consecutiveFailures = 0;
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -650,10 +663,9 @@
             updateSelectorColor(TARGET_ME);
             updateAnalogTable([]);
             updateDigitalTable([]);
-            updateDateTime();
+            updateTimestampHeader('');
             fetchData();
             setInterval(fetchData, POLL_INTERVAL_MS);
-            setInterval(updateDateTime, 1000);
         };
     </script>
 </body>
