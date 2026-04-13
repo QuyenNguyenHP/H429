@@ -1,164 +1,234 @@
-﻿# 🧩 Collector Service (Modbus → SQLite)
+# Collector Service 📥
 
-This module collects live generator data from Modbus devices and stores it into SQLite for the backend/frontend dashboard.
+Collector module for H429 data import and SQLite sync ⚙️
 
-## ✨ What It Does
-- 🔌 Connects to Modbus TCP device(s)
-- 📥 Reads analog and digital signals
-- 📝 Logs readings to CSV files
-- 💾 Upserts latest values into SQLite table `live_engine_data`
-- 🔁 Reconnects automatically when connection is lost
+## 1. What This Folder Contains 📁
 
-## 📁 Main Files
-- `data_collector.py` → main collector script
-- `modbus_collector.py` → additional collector script (if used)
-
-## 🗄️ Database Path
-In `data_collector.py`, the DB path is configured as:
-
-```python
-LIVE_DB_PATH = Path(__file__).resolve().parent / "live_engine_data.db"
+```text
+collector/
+  csv_received/
+  csv_archived/
+  Public_key_to_decrypt_asc_file/
+  live_engine_data.db
+  mode1_import_data_from_drums.py
+  mode2_data_collector_from_database.py
+  requirements.txt
+  README.md
 ```
 
-This means data is written to:
-- `engine-touchscreen-app/collector/live_engine_data.db`
+## 2. Main Purpose 🎯
 
-## 🧱 Table Used
-The collector writes into table:
+This folder is responsible for keeping `live_engine_data.db` up to date for the backend/frontend.
+
+It currently supports 2 data modes:
+
+- `Mode 1` 📦
+  - Reads the newest file from `csv_received/`
+  - Supports both `.csv` and `.zip`
+  - Imports data into SQLite
+  - Archives the processed source file into `csv_archived/`
+
+- `Mode 2` 🗄️
+  - Connects to a MySQL source
+  - Pulls the latest rows by `MAX(TimeStamp)`
+  - Normalizes them
+  - Replaces data in local SQLite
+
+## 3. Active Scripts 🚀
+
+- `mode1_import_data_from_drums.py`
+  - Main collector for uploaded DRUMS files
+  - Watches `csv_received/`
+  - Handles merged CSV and zipped CSV input
+  - Writes to `live_engine_data.db`
+  - Uses backend flag file `.data_connection_enabled` to decide whether import should run
+
+- `mode2_data_collector_from_database.py`
+  - Collector for MySQL database mode
+  - Pulls latest source rows from remote MySQL
+  - Rebuilds the SQLite live table from normalized rows
+  - Also respects backend `.data_connection_enabled`
+
+## 4. Database Path 🗄️
+
+SQLite is stored at:
+
+- `collector/live_engine_data.db`
+
+Used table:
+
 - `live_engine_data`
 
-Typical fields:
+Main columns:
+
 - `imo`
 - `serial`
+- `dg_name`
 - `addr`
 - `label`
 - `timestamp`
 - `val`
 - `unit`
 
-## ▶️ How To Run
-From project root:
+## 5. Mode 1 Flow 🔄
+
+Source folders:
+
+- `csv_received/` → incoming files waiting to import
+- `csv_archived/` → processed files after successful import
+
+Behavior:
+
+- Selects the newest file in `csv_received/`
+- Accepts `.csv` or `.zip`
+- If input is `.zip`, extracts the newest CSV from inside the archive
+- Parses DRUMS merged rows such as:
+  - `imo,serial,addr,label,timestamp,val,unit`
+- Splits machine name from label when needed:
+  - `DG#1 ...`
+  - `ME_PORT ...`
+  - `ME_STBD ...`
+  - `PMS ...`
+- Imports into SQLite and then archives the original source file
+- Cleans temporary extracted files after import
+
+Important files:
+
+- `csv_received/H429_merged_*.csv`
+- `csv_received/H429_merged_*.zip`
+
+## 6. Mode 2 Flow 🌐
+
+Mode 2 reads directly from MySQL using environment variables.
+
+Default variables in script:
+
+- `MYSQL_HOST`
+- `MYSQL_PORT`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_DATABASE`
+- `MYSQL_TABLE`
+
+Behavior:
+
+- Connects to MySQL
+- Reads rows at latest `TimeStamp`
+- Normalizes `dg_name` and `label`
+- Replaces all rows in `live_engine_data.db`
+
+## 7. Connection Control 🔌
+
+Both mode scripts check the backend flag file:
+
+- `backend/.data_connection_enabled`
+
+Current behavior:
+
+- `mode1_import_data_from_drums.py`
+  - Stops importing when the flag is missing or disabled
+
+- `mode2_data_collector_from_database.py`
+  - Runs by default if the flag file is missing
+  - Stops only when the flag exists and is set to disabled
+
+This is used by the frontend/backend `DATA CONNECTION` control on the home page 🧭
+
+## 8. How To Run ▶️
+
+Install dependencies:
 
 ```bash
 pip install -r collector/requirements.txt
 ```
 
-Then run:
+Run Mode 1 once:
 
 ```bash
 cd collector
-python data_collector.py
+python mode1_import_data_from_drums.py --once
 ```
 
-If your environment uses `python3`:
+Run Mode 1 continuously:
 
 ```bash
 cd collector
-python3 data_collector.py
+python mode1_import_data_from_drums.py
 ```
 
-## ⚙️ Config Points (Inside Script)
-Edit these values in `data_collector.py` as needed:
-- `DG1_IP`
-- `DG1_SLAVE_ID`
-- `DG1_Name`
-- `DG1_SerialNo`
-- `CSV_LOG_PREFIX`
-
-## 📤 Output
-- CSV files in current working directory (prefix like `H429_...csv`)
-- SQLite updates in `collector/live_engine_data.db`
-
-### Disable CSV to avoid frontend auto-reload flicker
-If you run frontend with a live-reload server, frequent CSV writes can trigger full page reloads.
-
-- Default now: CSV logging is enabled (`ENABLE_CSV_LOG=1`)
-- To disable CSV logging:
+Run Mode 2 once:
 
 ```bash
-ENABLE_CSV_LOG=0 python data_collector.py
+cd collector
+python mode2_data_collector_from_database.py --once
 ```
 
-## 🛠️ Troubleshooting
-
-1. No data in dashboard
-- Check collector is running
-- Check backend API response:
-  - `GET /api/live/analog_lable_value`
-
-2. Modbus connection fails
-- Verify IP and slave ID
-- Ensure device is reachable from host network
-
-3. SQLite file not updating
-- Confirm DB path is correct
-- Confirm write permissions for project folders
-
-4. Values look stale
-- Collector loop writes periodically (every few seconds)
-- Check collector terminal logs for reconnect/errors
-
-## 🔄 Auto-Run on Raspberry Pi with systemd
-
-To automatically start the collector service on boot, create a systemd service.
-
-### Prerequisites
-- Ensure Python and required packages are installed:
-  ```bash
-  sudo apt update
-  sudo apt install python3 python3-pip
-  pip3 install -r requirements.txt
-  ```
-
-### Create Service File
-Create a new service file:
+Run Mode 2 continuously:
 
 ```bash
-sudo nano /etc/systemd/system/collector.service
+cd collector
+python mode2_data_collector_from_database.py
 ```
 
-Add the following content (replace `/path/to/your/project` with the actual path to your `engine-touchscreen-app` directory):
+## 9. Environment Variables ⚙️
 
-```ini
-[Unit]
-Description=Engine Data Collector Service
-After=network.target
+### Mode 1
 
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/path/to/your/project/engine-touchscreen-app/collector
-ExecStart=/usr/bin/python3 data_collector.py
-Restart=always
-RestartSec=5
+- `CSV_IMPORT_INTERVAL`
+  - Polling interval in seconds
+  - Default: `5`
 
-[Install]
-WantedBy=multi-user.target
-```
+### Mode 2
 
-### Enable and Start Service
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable collector.service
-sudo systemctl start collector.service
-```
+- `DB_IMPORT_INTERVAL`
+  - Polling interval in seconds
+  - Default: `210`
 
-### Check Status
-```bash
-sudo systemctl status collector.service
-```
+- `MYSQL_HOST`
+- `MYSQL_PORT`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_DATABASE`
+- `MYSQL_TABLE`
 
-### View Logs
-```bash
-journalctl -u collector.service -f
-```
+## 10. Output Summary 📤
 
-### Stop/Disable Service (if needed)
-```bash
-sudo systemctl stop collector.service
-sudo systemctl disable collector.service
-```
+- Imported live data goes to:
+  - `collector/live_engine_data.db`
 
-## 📌 Notes
-- Collector currently stores latest point per key using upsert logic.
-- For long-term history/analytics, consider adding a separate history table in future.
+- Incoming source files come from:
+  - `collector/csv_received/`
+
+- Processed source files move to:
+  - `collector/csv_archived/`
+
+## 11. Troubleshooting 🛠️
+
+1. No data in frontend ❌
+- Check backend is reading from `collector/live_engine_data.db`
+- Confirm the selected collector mode is running
+- Check `backend/.data_connection_enabled`
+
+2. Files stay in `csv_received/` 📄
+- Check importer logs for parse/import errors
+- Verify the file is a valid DRUMS merged CSV or ZIP containing CSV
+
+3. ZIP file does not import 📦
+- Make sure the ZIP actually contains at least one `.csv`
+- Script will select the newest CSV member inside the ZIP
+
+4. SQLite is not updated 🗃️
+- Confirm write permission on `collector/`
+- Confirm no other process is locking `live_engine_data.db`
+
+5. Mode 2 cannot read MySQL 🌐
+- Verify host, port, user, password, database, and table
+- Ensure a MySQL driver is installed:
+  - `pymysql`
+  - or `mysql-connector-python`
+
+## 12. Notes 📝
+
+- `live_engine_data.db` is the live data source used by backend APIs
+- `mode1_import_data_from_drums.py` is the current replacement for the older CSV import flow
+- `Public_key_to_decrypt_asc_file/` exists in this folder, but decryption flow is not handled in the current README
