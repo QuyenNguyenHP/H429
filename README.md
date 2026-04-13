@@ -200,7 +200,143 @@ sudo ufw allow 5170/tcp
 
 Frontend hiện tự gọi API theo hostname hiện tại với cổng `8131`, nên khi mở trang từ `http://<VPS-IP>:5170`, frontend sẽ gọi API tới `http://<VPS-IP>:8131`.
 
-## 📘 API Docs
+## � Deploy on Raspberry Pi with Kiosk Mode
+
+Hướng dẫn triển khai dự án trên Raspberry Pi với chế độ kiosk (màn hình cảm ứng toàn màn hình).
+
+### Yêu cầu hệ thống
+
+- Raspberry Pi 4 hoặc mới hơn (khuyến nghị)
+- Raspberry Pi OS (64-bit) với desktop
+- Màn hình cảm ứng
+- Kết nối mạng
+
+### 1) Cài đặt hệ điều hành và cập nhật
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3 python3-pip chromium-browser unclutter x11-xserver-utils
+```
+
+### 2) Sao chép mã nguồn
+
+```bash
+mkdir -p ~/H429
+cd ~/H429
+# Sao chép toàn bộ mã nguồn vào thư mục này
+```
+
+### 3) Cài dependencies
+
+```bash
+cd ~/H429
+pip3 install -r requirements.txt
+```
+
+### 4) Tạo service cho backend
+
+Tạo file `/etc/systemd/system/engine-backend.service`:
+
+```ini
+[Unit]
+Description=Engine Touchscreen Backend
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/home/pi/H429/backend
+ExecStart=python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8131
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 5) Tạo service cho frontend
+
+Tạo file `/etc/systemd/system/engine-frontend.service`:
+
+```ini
+[Unit]
+Description=Engine Touchscreen Frontend
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/home/pi/H429/frontend
+ExecStart=python3 -m http.server 5170 --bind 0.0.0.0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 6) Cấu hình kiosk mode
+
+Tạo script khởi động kiosk: `/home/pi/start_kiosk.sh`
+
+```bash
+#!/bin/bash
+# Ẩn con trỏ chuột
+unclutter -idle 0.1 -root &
+
+# Chờ frontend service khởi động
+sleep 10
+
+# Mở Chromium trong chế độ kiosk
+chromium-browser --kiosk --disable-infobars --disable-session-crashed-bubble --disable-component-update --no-first-run --disable-background-timer-throttling --disable-renderer-backgrounding http://localhost:5170/index.html
+```
+
+Làm cho script có thể thực thi:
+
+```bash
+chmod +x /home/pi/start_kiosk.sh
+```
+
+### 7) Tự động khởi động kiosk khi boot
+
+Chỉnh sửa `/etc/xdg/lxsession/LXDE-pi/autostart`:
+
+```bash
+@lxpanel --profile LXDE-pi
+@pcmanfm --desktop --profile LXDE-pi
+@/home/pi/start_kiosk.sh
+```
+
+### 8) Khởi động services
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable engine-backend
+sudo systemctl enable engine-frontend
+sudo systemctl start engine-backend
+sudo systemctl start engine-frontend
+```
+
+### 9) Khởi động lại để áp dụng kiosk
+
+```bash
+sudo reboot
+```
+
+Sau khi khởi động lại, Raspberry Pi sẽ tự động hiển thị giao diện frontend trong chế độ kiosk toàn màn hình.
+
+### 10) (Tùy chọn) Chạy collector
+
+Nếu cần thu thập dữ liệu:
+
+```bash
+cd ~/H429/collector
+python3 data_collector.py &
+```
+
+Để chạy collector tự động, tạo service tương tự.
+
+## 🀽� API Docs
 
 - Swagger UI: `http://localhost:8131/docs`
 - OpenAPI JSON: `http://localhost:8131/openapi.json`
@@ -221,9 +357,11 @@ Frontend hiện tự gọi API theo hostname hiện tại với cổng `8131`, n
 Backend file: `backend/app/api/Check_all_status_lable.py`
 
 Endpoint:
+
 - `GET /api/check_all_status_lable/all`
 
 Response shape (per machine):
+
 - `dg_name`: `DG#1`, `DG#2`, `DG#3`, `ME-PORT`, `ME-STBD`
 - `analog`: list of analog points with `status`
 - `digital`: list of digital points with `status`
@@ -237,18 +375,21 @@ Response shape (per machine):
 - `FUEL OIL PRESSURE ENGINE INLET` and `LUB OIL PRESSURE` are threshold-checked only when machine is running.
 
 Running condition used for threshold checks:
+
 - DG#1..DG#3: running when digital `ENGINE RUN` is ON/1.
 - ME-PORT, ME-STBD: running when analog `M/E REVOLUTION > 0`.
 
 ### Digital logic
 
 Special status labels:
+
 - `ENGINE RUN`: `Running` / `Stop`
 - `READY TO START`: `Ready` / `Not Ready`
 - `PRIMING PUMP RUN`: `Running` / `Stop`
 - `No.1..No.6 ALARM REPOSE SIGNAL(...)`: `Repose` / `OFF`
 
 Digital alarm rules with repose interlock:
+
 - For these labels, `Alarm` only when signal value = 1 and related repose signal = 0:
   - `LUB OIL FILTER DIFFERENTIAL PRESSURE HIGH` -> repose No.6
   - `FUEL OIL PRESSURE LOW` -> repose No.2
@@ -268,5 +409,6 @@ Digital alarm rules with repose interlock:
 
 Current frontend pages use this API as the source of machine state.
 Machine Alarm light is ON when:
+
 - any analog point has `status = Critical`, OR
 - any digital point has `status = Alarm`.
