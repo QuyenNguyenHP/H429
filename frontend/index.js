@@ -1,7 +1,7 @@
 ﻿(function () {
   const config = window.APP_CONFIG || {};
   const paths = config.paths || {};
-  const inferredApiBase = `${window.location.protocol}//${window.location.hostname}:8000`;
+  const inferredApiBase = `${window.location.protocol}//${window.location.hostname}:8131`;
   const API_BASE = config.apiBaseUrl || window.API_BASE_URL || inferredApiBase;
   const API_PATH = paths.analog || "/api/live/analog_lable_value";
   const POLL_MS = Number(config.refreshMs) > 0 ? Number(config.refreshMs) : 5000;

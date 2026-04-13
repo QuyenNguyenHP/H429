@@ -70,7 +70,7 @@
 
         const protocol = global.location?.protocol === "https:" ? "https:" : "http:";
         const hostname = global.location?.hostname || "localhost";
-        const resolvedPort = port == null ? "8000" : String(port);
+        const resolvedPort = port == null ? "8131" : String(port);
         return `${protocol}//${hostname}:${resolvedPort}`;
     }
 

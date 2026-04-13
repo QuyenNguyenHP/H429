@@ -95,30 +95,30 @@ Or with Uvicorn:
 
 ```bash
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8131 --reload
 ```
 
 ## API Docs 📘
 
-- Swagger UI: `http://localhost:8000/docs`
-- OpenAPI JSON: `http://localhost:8000/openapi.json`
+- Swagger UI: `http://localhost:8131/docs`
+- OpenAPI JSON: `http://localhost:8131/openapi.json`
 
 ## Quick Test 🧪
 
 PowerShell:
 
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:8000/api/dashboard/analog_lable_value" -Method Get | ConvertTo-Json -Depth 5
-Invoke-RestMethod -Uri "http://localhost:8000/api/dashboard/analog_lable_value_ME" -Method Get | ConvertTo-Json -Depth 5
-Invoke-RestMethod -Uri "http://localhost:8000/api/index/DG%231" -Method Get | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "http://localhost:8131/api/dashboard/analog_lable_value" -Method Get | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "http://localhost:8131/api/dashboard/analog_lable_value_ME" -Method Get | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "http://localhost:8131/api/index/DG%231" -Method Get | ConvertTo-Json -Depth 5
 ```
 
 Browser:
 
-- `http://localhost:8000/api/dashboard/analog_lable_value`
-- `http://localhost:8000/api/dashboard/live_digital_value`
-- `http://localhost:8000/api/dashboard/dg_status`
-- `http://localhost:8000/api/index/DG%231`
+- `http://localhost:8131/api/dashboard/analog_lable_value`
+- `http://localhost:8131/api/dashboard/live_digital_value`
+- `http://localhost:8131/api/dashboard/dg_status`
+- `http://localhost:8131/api/index/DG%231`
 
 ## Troubleshooting 🛠️
 
@@ -127,7 +127,7 @@ Browser:
 - Verify `timestamp` values are recent.
 
 2. Frontend cannot fetch API 🌐
-- Confirm backend is running at `localhost:8000`.
+- Confirm backend is running at `localhost:8131`.
 - Verify frontend endpoints match current routes (`/api/dashboard/*`, `/api/index/*`).
 
 3. Import/module errors 📦

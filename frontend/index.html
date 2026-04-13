@@ -272,9 +272,9 @@
     <script>
         const API_BASE = (() => {
             const hostname = window.location.hostname || "localhost";
-            if (window.location.protocol === "file:") return `http://${hostname}:8000`;
+            if (window.location.protocol === "file:") return `http://${hostname}:8131`;
             const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-            return `${protocol}//${hostname}:8000`;
+            return `${protocol}//${hostname}:8131`;
         })();
         const STATUS_API = "/api/check_all_status_lable/all";
         let isDataConnected = false;

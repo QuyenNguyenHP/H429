@@ -73,7 +73,7 @@ cd backend
 python run.py
 ```
 
-Default backend URL: `http://localhost:8000`
+Default backend URL: `http://localhost:8131`
 
 ### 3) Run frontend 🌐
 
@@ -100,7 +100,7 @@ Ví dụ dưới đây dùng:
 
 - source code đặt tại `/opt/engine-touchscreen-app`
 - user chạy service là `ubuntu`
-- backend chạy cổng `8000`
+- backend chạy cổng `8131`
 - frontend static server chạy cổng `5170`
 
 Nếu VPS của bạn dùng user hoặc đường dẫn khác, hãy thay lại `User=`, `Group=`, `WorkingDirectory=` và `ExecStart=`.
@@ -127,7 +127,7 @@ After=network.target
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/engine-touchscreen-app/backend
-ExecStart=/opt/engine-touchscreen-app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+ExecStart=/opt/engine-touchscreen-app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8131
 Restart=always
 RestartSec=5
 
@@ -188,22 +188,22 @@ sudo journalctl -u engine-frontend -f
 
 ### 6) Mở port hoặc reverse proxy
 
-- Backend API: `8000`
+- Backend API: `8131`
 - Frontend static files: `5170`
 
 Nếu dùng firewall:
 
 ```bash
-sudo ufw allow 8000/tcp
+sudo ufw allow 8131/tcp
 sudo ufw allow 5170/tcp
 ```
 
-Frontend hiện tự gọi API theo hostname hiện tại với cổng `8000`, nên khi mở trang từ `http://<VPS-IP>:5170`, frontend sẽ gọi API tới `http://<VPS-IP>:8000`.
+Frontend hiện tự gọi API theo hostname hiện tại với cổng `8131`, nên khi mở trang từ `http://<VPS-IP>:5170`, frontend sẽ gọi API tới `http://<VPS-IP>:8131`.
 
 ## 📘 API Docs
 
-- Swagger UI: `http://localhost:8000/docs`
-- OpenAPI JSON: `http://localhost:8000/openapi.json`
+- Swagger UI: `http://localhost:8131/docs`
+- OpenAPI JSON: `http://localhost:8131/openapi.json`
 
 ## 🛠️ Important Notes
 

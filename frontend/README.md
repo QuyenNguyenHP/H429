@@ -64,7 +64,7 @@ This file is loaded by:
 
 Base URL in frontend:
 
-- `http://localhost:8000`
+- `http://localhost:8131`
 
 ### `index.html`
 
