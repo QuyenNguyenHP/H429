@@ -215,7 +215,7 @@ Hướng dẫn triển khai dự án trên Raspberry Pi với chế độ kiosk 
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install python3 python3-pip chromium-browser unclutter x11-xserver-utils
+sudo apt install python3 python3-pip chromium unclutter x11-xserver-utils
 ```
 
 ### 2) Sao chép mã nguồn
@@ -245,8 +245,8 @@ After=network.target
 [Service]
 User=root
 Group=root
-WorkingDirectory=/home/pi/H429/backend
-ExecStart=python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8131
+WorkingDirectory=/home/drums/H429/backend
+ExecStart=python3 run.py
 Restart=always
 RestartSec=5
 
@@ -266,8 +266,8 @@ After=network.target
 [Service]
 User=root
 Group=root
-WorkingDirectory=/home/pi/H429/frontend
-ExecStart=python3 -m http.server 5170 --bind 0.0.0.0
+WorkingDirectory=/home/drums/H429/frontend
+ExecStart=sudo python3 -m http.server 5170 --bind 0.0.0.0
 Restart=always
 RestartSec=5
 
@@ -277,7 +277,7 @@ WantedBy=multi-user.target
 
 ### 6) Cấu hình kiosk mode
 
-Tạo script khởi động kiosk: `/home/pi/start_kiosk.sh`
+Tạo script khởi động kiosk: `/home/drums/start_kiosk.sh`
 
 ```bash
 #!/bin/bash
@@ -288,23 +288,29 @@ unclutter -idle 0.1 -root &
 sleep 10
 
 # Mở Chromium trong chế độ kiosk
-chromium-browser --kiosk --disable-infobars --disable-session-crashed-bubble --disable-component-update --no-first-run --disable-background-timer-throttling --disable-renderer-backgrounding http://localhost:5170/index.html
+chromium --kiosk --disable-infobars --disable-session-crashed-bubble --disable-component-update --no-first-run --disable-background-timer-throttling --disable-renderer-backgrounding http://localhost:5170/index.html
 ```
 
 Làm cho script có thể thực thi:
 
 ```bash
-chmod +x /home/pi/start_kiosk.sh
+chmod +x /home/drums/start_kiosk.sh
 ```
 
 ### 7) Tự động khởi động kiosk khi boot
 
-Chỉnh sửa `/etc/xdg/lxsession/LXDE-pi/autostart`:
+Tạo thư mục nếu chưa có:
+
+```bash
+mkdir -p ~/.config/lxsession/LXDE-pi
+```
+
+Chỉnh sửa `~/.config/lxsession/LXDE-pi/autostart`:
 
 ```bash
 @lxpanel --profile LXDE-pi
 @pcmanfm --desktop --profile LXDE-pi
-@/home/pi/start_kiosk.sh
+@/home/drums/start_kiosk.sh
 ```
 
 ### 8) Khởi động services
