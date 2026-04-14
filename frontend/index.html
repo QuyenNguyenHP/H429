@@ -278,6 +278,8 @@
         })();
         const STATUS_API = "/api/check_all_status_lable/all";
         let isDataConnected = false;
+        const INDEX_CACHE_KEY = "drums:index:last_status_v1";
+        const CONN_CACHE_KEY = "drums:index:data_connection_v1";
         const INDEX_DG_CONFIG = [
             { cardNo: 1, dgName: "DG#1", hasPms: true },
             { cardNo: 2, dgName: "DG#2", hasPms: true },
@@ -421,6 +423,7 @@
         function setDataConnectionUI(connected) {
             const btn = document.getElementById("data-conn-btn");
             const state = document.getElementById("data-conn-state");
+            const modeSelect = document.getElementById("data-conn-mode");
             if (!btn || !state) return;
             isDataConnected = !!connected;
             btn.dataset.connected = connected ? "1" : "0";
@@ -434,6 +437,8 @@
             state.textContent = connected ? "Connected" : "No Connection";
             state.classList.toggle("text-green-700", connected);
             state.classList.toggle("text-slate-600", !connected);
+            state.classList.remove("text-red-700");
+            if (modeSelect) modeSelect.disabled = !!connected;
         }
 
         function setDataConnectionError(message) {
@@ -452,6 +457,9 @@
                 const modeSelect = document.getElementById("data-conn-mode");
                 if (modeSelect && payload?.mode) modeSelect.value = String(payload.mode);
                 setDataConnectionUI(!!payload?.connected);
+                try {
+                    sessionStorage.setItem(CONN_CACHE_KEY, JSON.stringify({ connected: !!payload?.connected, mode: payload?.mode || "mode1" }));
+                } catch (_) {}
                 if (payload?.collector_script) console.log("Collector script:", payload.collector_script);
             } catch (error) {
                 console.error("Data connection status fetch error:", error);
@@ -493,6 +501,9 @@
                     }
                     const payload = await res.json();
                     setDataConnectionUI(!!payload?.connected);
+                    try {
+                        sessionStorage.setItem(CONN_CACHE_KEY, JSON.stringify({ connected: !!payload?.connected, mode: modeSelect.value || "mode1" }));
+                    } catch (_) {}
                     if (payload?.collector_script) console.log("Collector script:", payload.collector_script);
                 } catch (error) {
                     console.error("Data connection connect error:", error);
@@ -510,7 +521,33 @@
                 if (!res.ok) throw new Error(`Status API error: ${res.status}`);
                 const payload = await res.json();
                 const rows = Array.isArray(payload) ? payload : [];
+                try {
+                    sessionStorage.setItem(INDEX_CACHE_KEY, JSON.stringify(rows));
+                } catch (_) {}
 
+                applyIndexRows(rows);
+            } catch (error) {
+                console.error("Index API fetch error:", error);
+                INDEX_DG_CONFIG.forEach((cfg) => {
+                    setDGState(cfg.cardNo, false, false, false, false);
+                    if (!cfg.hasPms) return;
+                    const dgNo = cfg.cardNo;
+                    const pfEl = document.getElementById(`pms-card-dg${dgNo}-pf`);
+                    const freqEl = document.getElementById(`pms-card-dg${dgNo}-freq`);
+                    const curEl = document.getElementById(`pms-card-dg${dgNo}-cur`);
+                    const volEl = document.getElementById(`pms-card-dg${dgNo}-vol`);
+                    const pwrEl = document.getElementById(`pms-card-dg${dgNo}-pwr`);
+
+                    if (pfEl) pfEl.textContent = "--";
+                    if (freqEl) freqEl.textContent = "--";
+                    if (curEl) curEl.textContent = "--";
+                    if (volEl) volEl.textContent = "--";
+                    if (pwrEl) pwrEl.textContent = "--";
+                });
+            }
+        }
+
+        function applyIndexRows(rows) {
                 INDEX_DG_CONFIG.forEach((cfg) => {
                     const machine = rows.find((item) => String(item?.dg_name || "").trim().toUpperCase() === cfg.dgName.toUpperCase());
                     const digital = Array.isArray(machine?.digital) ? machine.digital : [];
@@ -539,30 +576,38 @@
                     const volEl = document.getElementById(`pms-card-dg${dgNo}-vol`);
                     const pwrEl = document.getElementById(`pms-card-dg${dgNo}-pwr`);
 
-                    if (pfEl) pfEl.textContent = formatPmsValue(pms.power_factor, { treatAsEmptyValue: 32.768 });
+                    if (pfEl) pfEl.textContent = formatPmsValue(pms.power_factor, { treatAsEmptyValue: 32.768, decimals: 2 });
                     if (freqEl) freqEl.textContent = formatPmsValue(pms.frequency);
                     if (curEl) curEl.textContent = formatPmsValue(pms.current, { decimals: 2 });
                     if (volEl) volEl.textContent = formatPmsValue(pms.voltage);
                     if (pwrEl) pwrEl.textContent = formatPmsValue(pms.power_kw);
                 });
-            } catch (error) {
-                console.error("Index API fetch error:", error);
-                INDEX_DG_CONFIG.forEach((cfg) => {
-                    setDGState(cfg.cardNo, false, false, false, false);
-                    if (!cfg.hasPms) return;
-                    const dgNo = cfg.cardNo;
-                    const pfEl = document.getElementById(`pms-card-dg${dgNo}-pf`);
-                    const freqEl = document.getElementById(`pms-card-dg${dgNo}-freq`);
-                    const curEl = document.getElementById(`pms-card-dg${dgNo}-cur`);
-                    const volEl = document.getElementById(`pms-card-dg${dgNo}-vol`);
-                    const pwrEl = document.getElementById(`pms-card-dg${dgNo}-pwr`);
+        }
 
-                    if (pfEl) pfEl.textContent = "--";
-                    if (freqEl) freqEl.textContent = "--";
-                    if (curEl) curEl.textContent = "--";
-                    if (volEl) volEl.textContent = "--";
-                    if (pwrEl) pwrEl.textContent = "--";
-                });
+        function restoreIndexFromCache() {
+            try {
+                const rawConn = sessionStorage.getItem(CONN_CACHE_KEY);
+                if (rawConn) {
+                    const cachedConn = JSON.parse(rawConn);
+                    if (typeof cachedConn?.connected === "boolean") {
+                        setDataConnectionUI(cachedConn.connected);
+                    }
+                    const modeSelect = document.getElementById("data-conn-mode");
+                    if (modeSelect && cachedConn?.mode) modeSelect.value = String(cachedConn.mode);
+                }
+
+                const rawRows = sessionStorage.getItem(INDEX_CACHE_KEY);
+                if (!rawRows) return;
+                const rows = JSON.parse(rawRows);
+                if (!Array.isArray(rows)) return;
+                applyIndexRows(rows);
+            } catch (_) {}
+        }
+
+        async function refreshConnectionAndStatus() {
+            await loadDataConnectionStatus();
+            if (isDataConnected) {
+                await loadIndexStatus();
             }
         }
 
@@ -570,13 +615,18 @@
         window.onload = () => {
             applyUILayout();
             bindDataConnectionControls();
-            loadDataConnectionStatus();
+            restoreIndexFromCache();
+            refreshConnectionAndStatus();
             updateClock();
-            loadIndexStatus();
             setInterval(updateClock, 1000); // Cập nhật mỗi giây
             setInterval(loadIndexStatus, 5000); // Cập nhật trạng thái + PMS mỗi 5 giây
             setInterval(blinkAlerts, 750); // Nhấp nháy lỗi mỗi 0.75 giây
         };
+
+        window.addEventListener("pageshow", () => {
+            restoreIndexFromCache();
+            refreshConnectionAndStatus();
+        });
     </script>
 </body>
 </html>
