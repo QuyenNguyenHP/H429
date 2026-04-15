@@ -4,6 +4,7 @@ import os
 import signal
 import sqlite3
 import threading
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -167,15 +168,21 @@ def fetch_latest_rows_from_mysql() -> tuple[Any, list[tuple]]:
             logging.warning("Source table has no data.")
             return None, []
 
+        prev_ts = max_ts - timedelta(seconds=1)
         data_query = (
             f"SELECT `IMO_no`, `SerialNo`, `ChannelNo`, `ChannelDescription`, `TimeStamp`, `Value`, `Unit` "
             f"FROM `{MYSQL_TABLE}` "
-            f"WHERE `TimeStamp` = {placeholder} "
-            f"ORDER BY `SerialNo`, `ChannelNo`"
+            f"WHERE `TimeStamp` = {placeholder} OR `TimeStamp` = {placeholder} "
+            f"ORDER BY `TimeStamp`, `SerialNo`, `ChannelNo`"
         )
-        cur.execute(data_query, (max_ts,))
+        cur.execute(data_query, (max_ts, prev_ts))
         rows = cur.fetchall()
-        logging.info("Fetched %s row(s) at max TimeStamp=%s", len(rows), max_ts)
+        logging.info(
+            "Fetched %s row(s) at TimeStamp in {%s, %s}",
+            len(rows),
+            max_ts,
+            prev_ts,
+        )
         return max_ts, rows
     finally:
         conn.close()
@@ -236,12 +243,19 @@ def replace_into_sqlite(rows: list[tuple], conn: sqlite3.Connection) -> int:
     conn.executemany(
         """
         INSERT INTO live_engine_data (imo, serial, dg_name, addr, label, timestamp, val, unit)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(imo, serial, dg_name, addr) DO UPDATE SET
+            label = excluded.label,
+            timestamp = excluded.timestamp,
+            val = excluded.val,
+            unit = excluded.unit
+        WHERE datetime(excluded.timestamp) >= datetime(live_engine_data.timestamp);
         """,
         rows,
     )
     conn.commit()
-    return len(rows)
+    cur = conn.execute("SELECT COUNT(1) FROM live_engine_data;")
+    return int(cur.fetchone()[0])
 
 
 def run_once() -> None:
@@ -265,7 +279,8 @@ def run_once() -> None:
         ensure_sqlite_schema(sqlite_conn)
         imported = replace_into_sqlite(rows, sqlite_conn)
         logging.info(
-            "Replaced SQLite data with %s row(s) into (%s) from MySQL TimeStamp=%s",
+            "Imported %s MySQL row(s), stored %s deduplicated row(s) into (%s) from MySQL TimeStamp=%s",
+            len(rows),
             imported,
             SQLITE_DB_PATH.name,
             max_ts,

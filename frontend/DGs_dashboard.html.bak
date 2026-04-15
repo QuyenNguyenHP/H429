@@ -554,7 +554,7 @@
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-                const response = await fetch("http://localhost:8000/api/live/analog_lable_value", {
+                const response = await fetch("http://localhost:8131/api/live/analog_lable_value", {
                     signal: controller.signal,
                     cache: "no-store"
                 });
@@ -603,7 +603,6 @@
     </script>
 </body>
 </html>
-
 
 
 

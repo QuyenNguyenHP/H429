@@ -38,7 +38,7 @@
             </div>
 
             <div id="data-connection-box" class="header-box min-w-[270px]">
-                <div class="text-[10px] font-extrabold border-b border-gray-100 mb-2 text-center text-gray-600">DATA CONNECTION</div>
+                <div id="data-conn-title" class="text-[10px] font-extrabold border-b border-gray-100 mb-2 text-left text-gray-600">DATA CONNECTION</div>
                 <div class="flex items-center gap-2">
                     <select id="data-conn-mode" class="border border-slate-400 bg-white px-2 py-1 text-xs font-bold w-[120px]">
                         <option value="mode1">Mode 1</option>
@@ -47,6 +47,7 @@
                     <button id="data-conn-btn" class="header-clickable bg-blue-700 text-white px-3 py-1 text-xs font-extrabold border border-blue-900 hover:bg-blue-800">Connect</button>
                     <span id="data-conn-state" class="text-[11px] font-bold text-slate-600">No Connection</span>
                 </div>
+                <div id="data-conn-mode-hint" class="mt-1 text-[10px] font-semibold text-slate-600"></div>
             </div>
         </div>
 
@@ -63,7 +64,7 @@
                     <div class="dg-status-column">
                         <div class="dg-status-item">
                             <div id="dg1-ready-light" class="status-light light-ready"></div>
-                            <span class="dg-status-label font-extrabold">STAND BY</span>
+                            <span class="dg-status-label font-extrabold">READY TO START</span>
                         </div>
                         <div class="dg-status-item">
                             <div id="dg1-run-light" class="status-light light-run"></div>
@@ -88,7 +89,7 @@
                     <div class="dg-status-column">
                         <div class="dg-status-item">
                             <div id="dg2-ready-light" class="status-light light-ready"></div>
-                            <span class="dg-status-label font-extrabold">STAND BY</span>
+                            <span class="dg-status-label font-extrabold">READY TO START</span>
                         </div>
                         <div class="dg-status-item">
                             <div id="dg2-run-light" class="status-light light-run"></div>
@@ -113,7 +114,7 @@
                     <div class="dg-status-column">
                         <div class="dg-status-item">
                             <div id="dg3-ready-light" class="status-light light-ready"></div>
-                            <span class="dg-status-label font-extrabold">STAND BY</span>
+                            <span class="dg-status-label font-extrabold">READY TO START</span>
                         </div>
                         <div class="dg-status-item">
                             <div id="dg3-run-light" class="status-light light-run"></div>
@@ -272,9 +273,9 @@
     <script>
         const API_BASE = (() => {
             const hostname = window.location.hostname || "localhost";
-            if (window.location.protocol === "file:") return `http://${hostname}:8000`;
+            if (window.location.protocol === "file:") return `http://${hostname}:8131`;
             const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-            return `${protocol}//${hostname}:8000`;
+            return `${protocol}//${hostname}:8131`;
         })();
         const STATUS_API = "/api/check_all_status_lable/all";
         let isDataConnected = false;
@@ -397,9 +398,7 @@
             const linkFail = document.getElementById(`dg${dgNo}-link-fail`);
 
             if (readyLight) {
-                const standbyActive = (dgNo === 1 || dgNo === 2 || dgNo === 3) && hasData && !isRunning;
                 readyLight.classList.toggle("active", !!isReady);
-                readyLight.classList.toggle("standby-active", standbyActive);
             }
             if (runLight) runLight.classList.toggle("active", !!isRunning);
             if (alarmLight) alarmLight.classList.toggle("active", !!hasAlarm);
@@ -424,6 +423,7 @@
             const btn = document.getElementById("data-conn-btn");
             const state = document.getElementById("data-conn-state");
             const modeSelect = document.getElementById("data-conn-mode");
+            const title = document.getElementById("data-conn-title");
             if (!btn || !state) return;
             isDataConnected = !!connected;
             btn.dataset.connected = connected ? "1" : "0";
@@ -439,6 +439,12 @@
             state.classList.toggle("text-slate-600", !connected);
             state.classList.remove("text-red-700");
             if (modeSelect) modeSelect.disabled = !!connected;
+            if (title) {
+                const source = (modeSelect && String(modeSelect.value).toLowerCase() === "mode1")
+                    ? "from database"
+                    : "from drums pannel";
+                title.textContent = connected ? `DATA CONNECTION : ${source}` : "DATA CONNECTION";
+            }
         }
 
         function setDataConnectionError(message) {
@@ -449,6 +455,20 @@
             state.classList.add("text-red-700");
         }
 
+        function getDataModeTooltip(mode) {
+            return String(mode || "").toLowerCase() === "mode1"
+                ? "getting data from database"
+                : "getting data from drums panel";
+        }
+
+        function updateDataModeTooltip() {
+            const modeSelect = document.getElementById("data-conn-mode");
+            if (!modeSelect) return;
+            const tooltip = getDataModeTooltip(modeSelect.value);
+            const hint = document.getElementById("data-conn-mode-hint");
+            if (hint) hint.textContent = `System info: ${tooltip}`;
+        }
+
         async function loadDataConnectionStatus() {
             try {
                 const res = await fetch(`${API_BASE}/api/system/data_connection/status`, { cache: "no-store" });
@@ -456,6 +476,7 @@
                 const payload = await res.json();
                 const modeSelect = document.getElementById("data-conn-mode");
                 if (modeSelect && payload?.mode) modeSelect.value = String(payload.mode);
+                updateDataModeTooltip();
                 setDataConnectionUI(!!payload?.connected);
                 try {
                     sessionStorage.setItem(CONN_CACHE_KEY, JSON.stringify({ connected: !!payload?.connected, mode: payload?.mode || "mode1" }));
@@ -471,6 +492,8 @@
             const btn = document.getElementById("data-conn-btn");
             const modeSelect = document.getElementById("data-conn-mode");
             if (!btn || !modeSelect) return;
+            modeSelect.addEventListener("change", updateDataModeTooltip);
+            updateDataModeTooltip();
             btn.addEventListener("click", async () => {
                 btn.disabled = true;
                 try {
@@ -501,6 +524,7 @@
                     }
                     const payload = await res.json();
                     setDataConnectionUI(!!payload?.connected);
+                    updateDataModeTooltip();
                     try {
                         sessionStorage.setItem(CONN_CACHE_KEY, JSON.stringify({ connected: !!payload?.connected, mode: modeSelect.value || "mode1" }));
                     } catch (_) {}
@@ -595,6 +619,7 @@
                     const modeSelect = document.getElementById("data-conn-mode");
                     if (modeSelect && cachedConn?.mode) modeSelect.value = String(cachedConn.mode);
                 }
+                updateDataModeTooltip();
 
                 const rawRows = sessionStorage.getItem(INDEX_CACHE_KEY);
                 if (!rawRows) return;

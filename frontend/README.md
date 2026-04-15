@@ -1,6 +1,6 @@
 # Engine Touchscreen Frontend 🖥️
 
-Static frontend for DG and ME monitoring dashboards ⚙️
+Static frontend for the H429 monitoring UI ⚙️
 
 ## 1. Folder Structure 📁
 
@@ -19,81 +19,88 @@ frontend/
   DGs_dashboard_V2.html
   ME_dashboard.html
   dashboard_shared.js
-  DGs_dashboard.html.bak
   config.js
   index.js
   app.css
+  DGs_dashboard.html.bak
   README.md
 ```
 
 ## 2. Active Pages 🌐
 
-- `index.html`
+- `index.html` 🏠
+  - Home page for vessel `H429`
+  - Shows DG#1, DG#2, DG#3, ME-STBD, and ME-PORT summary cards
+  - Includes `DATA CONNECTION` controls with `Mode 1 / Mode 2`, `Connect`, and status text
+  - Loads machine status and PMS values from the backend summary API
 
-  - Home page 🏠
-  - DG#1, DG#2, DG#3 cards open `DGs_dashboard_V2.html`.
-  - ME-STBD and ME-PORT cards open `ME_dashboard.html`.
-  - Uses aggregated status/PMS API from `/api/index/*` 🔗
-- `DGs_dashboard_V2.html`
+- `DGs_dashboard_V2.html` 📊
+  - Detail dashboard for `DG#1`, `DG#2`, and `DG#3`
+  - DG selector can switch between DG pages and redirect to ME page when needed
+  - Uses aggregated status data plus per-machine timestamp API
 
-  - DG detail page for DG#1, DG#2, DG#3 📊
-  - Includes selector with DG and ME options.
-  - If user selects ME-* from this page, it redirects to `ME_dashboard.html` 🔀
-- `ME_dashboard.html`
+- `ME_dashboard.html` 🚢
+  - Detail dashboard for `ME-PORT` and `ME-STBD`
+  - Selector can switch back to DG pages
+  - Uses aggregated status data for analog, digital, ready/run, and alarm states
 
-  - ME detail page for ME-PORT and ME-STBD 🚢
-  - Includes selector with DG and ME options.
-  - If user selects DG#1/2/3 from this page, it redirects to `DGs_dashboard_V2.html` 🔀
+## 3. Shared Files 🧩
 
-## 3. Shared Script 🧩
-
-- `dashboard_shared.js` contains shared helpers used by both dashboards:
-  - DOM helper (`getById`) 🏷️
+- `dashboard_shared.js`
+  - Shared DOM helpers
   - DG name normalization
-  - Filter rows by selected machine
-  - ON/OFF normalization
-  - Layout helper (`applyLayoutToElement`) 📐
-  - Fetch timeout helper (`fetchWithTimeout`) ⏱️
+  - Shared fetch timeout helper
+  - `resolveApiOrigin()` helper with backend default port `8131`
 
-This file is loaded by:
+- `app.css`
+  - Shared stylesheet for `index.html`, `DGs_dashboard_V2.html`, and `ME_dashboard.html`
+  - Controls layout, card styling, status lights, tables, and engine overlay blocks
 
-- `DGs_dashboard_V2.html`
-- `ME_dashboard.html`
+- `config.js` and `index.js`
+  - Legacy/demo files
+  - Still point to backend port `8131`
+  - Not part of the main active dashboard flow
 
-## 4. API Endpoints Used by Frontend 🔌
+- `DGs_dashboard.html.bak`
+  - Backup file only 💾
+  - Not part of the active UI
 
-Base URL in frontend:
+## 4. Backend Connection 🔌
 
-- `http://localhost:8000`
+Default frontend API origin:
+
+- `http://localhost:8131`
+
+Behavior:
+
+- When served from `http://localhost:5170`, frontend calls backend on port `8131`
+- When opened directly with `file://`, `index.html` falls back to `http://localhost:8131`
+
+## 5. API Endpoints Used By Frontend 📡
 
 ### `index.html`
 
-- `GET /api/index/DG%231`
-- `GET /api/index/DG%232`
-- `GET /api/index/DG%233`
-- `GET /api/index/ME-PORT`
-- `GET /api/index/ME-STBD`
+- `GET /api/check_all_status_lable/all`
+- `GET /api/system/data_connection/status`
+- `POST /api/system/data_connection/connect`
+- `POST /api/system/data_connection/disconnect`
 
 ### `DGs_dashboard_V2.html`
 
-- `GET /api/dashboard/analog_lable_value` (DG mode)
-- `GET /api/dashboard/analog_lable_value_ME` (fallback when target is ME)
-- `GET /api/dashboard/live_digital_value`
-- `GET /api/dashboard/dg_status`
+- `GET /api/check_all_status_lable/all`
+- `GET /api/timestamp?dg_name=...`
 
 ### `ME_dashboard.html`
 
-- `GET /api/dashboard/analog_lable_value_ME`
-- `GET /api/dashboard/live_digital_value`
-- `GET /api/dashboard/dg_status`
+- `GET /api/check_all_status_lable/all`
 
-## 5. Run Frontend ▶️
+## 6. Run Frontend ▶️
 
-Open HTML files directly, or run a static server:
+Run a static server:
 
 ```bash
 cd frontend
-python3 -m http.server 5170 --bind 0.0.0.0
+python -m http.server 5170 --bind 0.0.0.0
 ```
 
 Then open:
@@ -102,8 +109,20 @@ Then open:
 - `http://localhost:5170/DGs_dashboard_V2.html?dg=DG%231`
 - `http://localhost:5170/ME_dashboard.html?dg=ME-PORT`
 
-## 6. Notes 📝
+Backend should be running at:
 
-- `DGs_dashboard.html.bak` is a backup file, not an active page 💾
-- `config.js` and `index.js` are legacy files; `app.css` is the shared stylesheet for `index.html`, `ME_dashboard.html`, and `DGs_dashboard_V2.html` 🎨
-- If icon/logo/CSS changes are not visible immediately, hard refresh with `Ctrl + F5` 🔄
+- `http://localhost:8131`
+
+## 7. Navigation Flow 🔁
+
+- `index.html` -> DG cards open `DGs_dashboard_V2.html`
+- `index.html` -> ME cards open `ME_dashboard.html`
+- `DGs_dashboard_V2.html` -> selecting `ME-PORT` or `ME-STBD` redirects to `ME_dashboard.html`
+- `ME_dashboard.html` -> selecting `DG#1`, `DG#2`, or `DG#3` redirects to `DGs_dashboard_V2.html`
+- Clicking the DRUMS logo on detail pages returns to `index.html`
+
+## 8. Notes 📝
+
+- Status lights are now steady and do not blink 💡
+- `FAIL CONNECTION !` text on the home page still blinks when data is missing ⚠️
+- If CSS or image changes do not appear immediately, use `Ctrl + F5` 🔄

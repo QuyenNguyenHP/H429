@@ -17,8 +17,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 COLLECTOR_DIR = PROJECT_ROOT / "collector"
 BACKEND_RUN_PATH = BACKEND_DIR / "run.py"
-MODE1_SCRIPT_PATH = COLLECTOR_DIR / "mode1_import_data_from_drums.py"
-MODE2_SCRIPT_PATH = COLLECTOR_DIR / "mode2_data_collector_from_database.py"
+MODE1_SCRIPT_PATH = COLLECTOR_DIR / "mode1_data_collector_from_database.py"
+MODE2_SCRIPT_PATH = COLLECTOR_DIR / "mode2_import_data_from_drums.py"
 STATE_FILE_PATH = BACKEND_DIR / ".data_connection_state.json"
 CONNECTION_FLAG_PATH = BACKEND_DIR / ".data_connection_enabled"
 
@@ -26,6 +26,7 @@ _backend_process: subprocess.Popen | None = None
 _collector_process: subprocess.Popen | None = None
 _collector_mode: str | None = None
 _collector_script: str | None = None
+BACKEND_PORT = 8131
 
 
 def _is_process_running(proc: subprocess.Popen | None) -> bool:
@@ -125,7 +126,7 @@ def status(db: Session = Depends(get_db)):
 
 @router.get("/data_connection/status")
 def data_connection_status():
-    backend_running = _is_port_open("127.0.0.1", 8000) or _is_process_running(_backend_process)
+    backend_running = _is_port_open("127.0.0.1", BACKEND_PORT) or _is_process_running(_backend_process)
     collector_running = _is_process_running(_collector_process)
     mode = _collector_mode if collector_running else None
     script = _collector_script if collector_running else None
@@ -159,7 +160,7 @@ def data_connection_connect(payload: dict):
     if mode is None:
         raise HTTPException(status_code=400, detail="mode must be 'mode1' or 'mode2'")
 
-    backend_running = _is_port_open("127.0.0.1", 8000) or _is_process_running(_backend_process)
+    backend_running = _is_port_open("127.0.0.1", BACKEND_PORT) or _is_process_running(_backend_process)
     if not backend_running:
         _backend_process = _spawn_python(BACKEND_RUN_PATH, BACKEND_DIR)
         backend_running = True
@@ -210,7 +211,7 @@ def data_connection_disconnect():
     _clear_state()
     _set_connection_enabled(False)
 
-    backend_running = _is_port_open("127.0.0.1", 8000) or _is_process_running(_backend_process)
+    backend_running = _is_port_open("127.0.0.1", BACKEND_PORT) or _is_process_running(_backend_process)
     return {
         "connected": False,
         "backend_running": backend_running,
